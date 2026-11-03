@@ -64,8 +64,10 @@ export interface Mandi {
   opening_time: string;
   closing_time: string;
   is_active: boolean;
+  is_verified?: boolean;
   distance_km?: number;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface SlotBooking {
@@ -91,6 +93,7 @@ export interface SlotBooking {
   completion_time?: string;
   delay_minutes?: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface FarmerDelay {

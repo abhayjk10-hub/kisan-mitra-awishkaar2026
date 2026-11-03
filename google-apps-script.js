@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * ============================================================================
  * KISAN MITRA — ALL-IN-ONE GOOGLE APPS SCRIPT
@@ -9,7 +10,7 @@
  *    exists, the script creates "Kisan Mitra — Farmer Support & Submissions"
  *    in your Google Drive, formats headers, sets dropdowns, and saves the ID.
  * 2. GMAIL INTEGRATION: Sends an instant, beautifully styled HTML email notification
- *    to your Gmail (ismparam786@gmail.com / active account) with a clickable
+ *    to your Gmail (active account / script property ADMIN_EMAIL) with a clickable
  *    "Call Farmer" button and direct link to the Google Sheet.
  * 3. SUPPORTS BOTH POST AND GET:
  *    - POST: Receives submissions from Kisan Mitra web app (JSON / text / form).
@@ -47,8 +48,8 @@ const CONFIG = {
   // Spreadsheet Title (used when auto-creating the sheet)
   SPREADSHEET_TITLE: 'Kisan Mitra — Farmer Support & Submissions',
 
-  // Email to receive submission alerts (defaults to your logged-in Gmail)
-  FALLBACK_EMAIL: 'ismparam786@gmail.com',
+  // Email to receive submission alerts (defaults to script property ADMIN_EMAIL or active account)
+  FALLBACK_EMAIL: PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL') || '',
 
   // Timezone for formatting timestamps
   TIMEZONE: 'Asia/Kolkata',
@@ -361,10 +362,10 @@ function doGet(e) {
     const url = ss.getUrl();
     const totalRows = Math.max(0, sheet.getLastRow() - 1);
 
-    let userEmail = 'ismparam786@gmail.com';
+    let userEmail = '';
     try {
-      userEmail = Session.getEffectiveUser().getEmail() || userEmail;
-    } catch (err) { }
+      userEmail = Session.getEffectiveUser().getEmail() || PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL') || 'Admin';
+    } catch { }
 
     const html = `
       <!DOCTYPE html>

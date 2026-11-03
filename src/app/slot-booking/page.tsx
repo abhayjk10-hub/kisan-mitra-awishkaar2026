@@ -9,15 +9,10 @@ import {
   CheckCircle2,
   Clock3,
   Compass,
-  FileText,
-  HelpCircle,
   LocateFixed,
   MapPin,
-  Navigation,
-  Phone,
   Printer,
   RefreshCw,
-  Share2,
   ShieldAlert,
   Sprout,
   Truck,
@@ -25,7 +20,6 @@ import {
   X,
   AlertTriangle,
   Ban,
-  Calendar,
   Sparkles,
 } from 'lucide-react';
 import PageContainer from '@/components/shared/PageContainer';
@@ -47,9 +41,13 @@ import {
   canCancelSlotBooking,
   cancelSlotBooking,
   getFarmerBookings,
+  getMandiQueue,
+  getMandiQueuePosition,
 } from '@/lib/mandi-service';
 import TransportCostCard from '@/components/shared/TransportCostCard';
 import { DEFAULT_TRANSPORT_RATE } from '@/lib/transport-calculator';
+import { toLocalISODate, getISTCurrentTime } from '@/lib/date-utils';
+import { SUPPORTED_DISTRICTS } from '@/lib/districts';
 
 export default function SlotBookingPage() {
   const { language } = useLanguage();
@@ -58,6 +56,7 @@ export default function SlotBookingPage() {
 
   // Location state
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>('');
   const [locationStatus, setLocationStatus] = useState<'prompting' | 'granted' | 'denied' | 'error'>('prompting');
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -73,7 +72,7 @@ export default function SlotBookingPage() {
     for (let i = 0; i < 7; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = toLocalISODate(d);
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
       const dayNum = String(d.getDate()).padStart(2, '0');
       const monthName = d.toLocaleDateString('en-US', { month: 'short' });
@@ -96,16 +95,35 @@ export default function SlotBookingPage() {
 
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number>(0);
 
+  // Mandi bookings for selected date (for real-time capacity and N of M left display) (H3)
+  const [mandiDateBookings, setMandiDateBookings] = useState<SlotBooking[]>([]);
+  const currentMandiId = selectedMandi?.id;
+
+  const loadSlotCapacities = useCallback(async () => {
+    if (!currentMandiId || !selectedDateIso) return;
+    try {
+      const q = await getMandiQueue(currentMandiId, selectedDateIso);
+      setMandiDateBookings(q);
+    } catch {
+      // ignore
+    }
+  }, [currentMandiId, selectedDateIso]);
+
+  useEffect(() => {
+    // Synchronize external database slot bookings for the selected date
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSlotCapacities();
+  }, [loadSlotCapacities]);
+
   // Farmer input fields
-  const [farmerName, setFarmerName] = useState('');
-  const [farmerPhone, setFarmerPhone] = useState('');
+  const [farmerName, setFarmerName] = useState<string>(() => String(user?.user_metadata?.full_name || user?.user_metadata?.name || ''));
+  const [farmerPhone, setFarmerPhone] = useState<string>(() => (user?.phone ? user.phone.replace(/\D/g, '').slice(-10) : ''));
   const [cropName, setCropName] = useState('Wheat (गहू)');
   const [quantity, setQuantity] = useState('15');
   const [vehicleNumber, setVehicleNumber] = useState('');
 
   // Delay & penalty check for farmer
   const [farmerDelays, setFarmerDelays] = useState<FarmerDelay[]>([]);
-  const [checkingDelays, setCheckingDelays] = useState(false);
 
   // Submission state & generated token modal
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,15 +143,17 @@ export default function SlotBookingPage() {
   useEffect(() => {
     if (user) {
       const metaName = user.user_metadata?.full_name || user.user_metadata?.name;
-      // User profile fields are synchronized into the editable booking form.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (metaName && !farmerName) setFarmerName(metaName);
-      if (user.phone && !farmerPhone) setFarmerPhone(user.phone.replace(/\D/g, '').slice(-10));
+      const phoneDigits = user.phone ? user.phone.replace(/\D/g, '').slice(-10) : '';
+      const timer = setTimeout(() => {
+        if (metaName) setFarmerName((prev: string) => prev || String(metaName));
+        if (phoneDigits) setFarmerPhone((prev: string) => prev || phoneDigits);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [user]);
 
   // Load farmer's existing bookings
-  const loadFarmerBookings = async () => {
+  const loadFarmerBookings = useCallback(async () => {
     const phone = farmerPhone.replace(/\D/g, '').slice(-10);
     const identifier = phone || user?.id;
     if (!identifier) return;
@@ -147,16 +167,17 @@ export default function SlotBookingPage() {
     } finally {
       setLoadingBookings(false);
     }
-  };
+  }, [farmerPhone, user?.id]);
 
   useEffect(() => {
     const cleanPhone = farmerPhone.replace(/\D/g, '').slice(-10);
     if (cleanPhone.length === 10 || user?.id) {
-      // Fetching the current user's bookings is an effect-triggered external request.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadFarmerBookings();
+      const timer = setTimeout(() => {
+        void loadFarmerBookings();
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [farmerPhone, user?.id]);
+  }, [farmerPhone, user?.id, loadFarmerBookings]);
 
   // Listen for real-time waitlist promotions and sync events across tabs
   useEffect(() => {
@@ -181,7 +202,7 @@ export default function SlotBookingPage() {
       }
     };
     return () => channel.close();
-  }, [farmerPhone]);
+  }, [farmerPhone, loadFarmerBookings]);
 
   // Handle slot cancellation action
   const handleConfirmCancellation = async () => {
@@ -224,8 +245,28 @@ export default function SlotBookingPage() {
     }
   }, [selectedMandiId]);
 
+  const handleDistrictChange = (districtId: string) => {
+    setSelectedDistrictId(districtId);
+    if (!districtId) {
+      if (locationStatus === 'granted' && userLocation) {
+        loadMandisList(userLocation.lat, userLocation.lng);
+      } else {
+        setUserLocation(null);
+        loadMandisList(undefined, undefined);
+      }
+      return;
+    }
+    const dist = SUPPORTED_DISTRICTS.find((d) => d.id === districtId);
+    if (dist) {
+      const coords = { lat: dist.latitude, lng: dist.longitude };
+      setUserLocation(coords);
+      setLocationStatus('granted');
+      loadMandisList(coords.lat, coords.lng);
+    }
+  };
+
   // Request browser location on mount
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     setLocationStatus('prompting');
     setLocationError(null);
 
@@ -250,42 +291,41 @@ export default function SlotBookingPage() {
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
-  };
+  }, [loadMandisList]);
 
   useEffect(() => {
-    // Geolocation is a browser API; its result initializes the page after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    requestLocation();
-  }, []);
+    const timer = setTimeout(() => {
+      requestLocation();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [requestLocation]);
 
   // Check farmer delay history whenever phone changes
   useEffect(() => {
     const cleanPhone = farmerPhone.replace(/\D/g, '');
     if (cleanPhone.length === 10) {
-      // Loading state tracks this phone-specific external lookup.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCheckingDelays(true);
       getFarmerDelays(cleanPhone)
         .then((delays) => {
           setFarmerDelays(delays);
         })
-        .catch(() => setFarmerDelays([]))
-        .finally(() => setCheckingDelays(false));
+        .catch(() => setFarmerDelays([]));
     } else {
-      // Clear lookup results when the identifier is no longer valid.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFarmerDelays([]);
+      const timer = setTimeout(() => {
+        setFarmerDelays([]);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [farmerPhone]);
 
   // Live subscription to confirmed booking so status updates in real-time
+  const activeConfirmedBookingId = confirmedBooking?.id;
   useEffect(() => {
-    if (!confirmedBooking) return;
-    const unsub = subscribeToFarmerBooking(confirmedBooking.id, (updated) => {
+    if (!activeConfirmedBookingId) return;
+    const unsub = subscribeToFarmerBooking(activeConfirmedBookingId, (updated) => {
       setConfirmedBooking(updated);
     });
     return () => unsub();
-  }, [confirmedBooking?.id]);
+  }, [activeConfirmedBookingId]);
 
   // Handle slot booking submission
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -329,6 +369,7 @@ export default function SlotBookingPage() {
         booking_date: selectedDateIso,
         slot_start_time: slot.start,
         slot_end_time: slot.end,
+        is_walkin: false,
       });
 
       if (result.error || !result.booking) {
@@ -338,20 +379,28 @@ export default function SlotBookingPage() {
 
       setConfirmedBooking(result.booking);
       loadFarmerBookings();
+      loadSlotCapacities();
 
       const bDateObj = result.booking.booking_date
         ? new Date(result.booking.booking_date + 'T00:00:00')
         : new Date();
       const bDay = bDateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
-      // Register with TokenContext for live Marquee tracking
+      // Retrieve real queue position from database/queue data (H9)
+      const queuePos = await getMandiQueuePosition(
+        selectedMandi.id,
+        result.booking.id,
+        result.booking.booking_date
+      );
+
+      // Register with TokenContext for live Marquee tracking with real calculated data
       setToken({
         tokenNumber: result.booking.token_number,
         mandiName: selectedMandi.name,
-        currentToken: 1,
-        totalAhead: 2,
+        currentToken: queuePos.currentToken,
+        totalAhead: queuePos.totalAhead,
         status: result.booking.status === 'active' ? 'now' : result.booking.status,
-        estimatedWaitMinutes: 15,
+        estimatedWaitMinutes: queuePos.estimatedWaitMinutes,
         slotTime: `${slot.start} – ${slot.end}`,
         bookingDate: result.booking.booking_date,
         dayOfWeek: bDay,
@@ -417,7 +466,11 @@ export default function SlotBookingPage() {
                   : t('slot.geoAccess', language)}
               </p>
               <p className="text-sm font-semibold text-primary-950">
-                {locationStatus === 'granted'
+                {selectedDistrictId
+                  ? t('slot.manualDistrictActive', language, {
+                      district: SUPPORTED_DISTRICTS.find((d) => d.id === selectedDistrictId)?.name || '',
+                    })
+                  : locationStatus === 'granted'
                   ? t('slot.geoActiveDesc', language)
                   : locationStatus === 'prompting'
                   ? t('slot.geoDetectingDesc', language)
@@ -425,14 +478,32 @@ export default function SlotBookingPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={requestLocation}
-            className="self-start sm:self-center inline-flex items-center gap-2 text-xs font-bold text-primary-800 hover:text-primary-950 bg-primary-100 hover:bg-primary-200 px-3.5 py-2 rounded-xl transition-colors shrink-0"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            {t('slot.refreshGps', language)}
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+            <select
+              value={selectedDistrictId}
+              onChange={(e) => handleDistrictChange(e.target.value)}
+              className="text-xs font-semibold bg-white border border-primary-300 rounded-xl px-2.5 py-2 text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              aria-label={t('slot.selectDistrict', language)}
+            >
+              <option value="">{t('slot.allDistricts', language)}</option>
+              {SUPPORTED_DISTRICTS.map((dist) => (
+                <option key={dist.id} value={dist.id}>
+                  {dist.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDistrictId('');
+                requestLocation();
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-800 hover:text-primary-950 bg-primary-100 hover:bg-primary-200 px-3 py-2 rounded-xl transition-colors shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              {t('slot.refreshGps', language)}
+            </button>
+          </div>
         </div>
 
         {/* Booking Form Layout */}
@@ -477,7 +548,7 @@ export default function SlotBookingPage() {
                               <>
                                 <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 flex items-center gap-1">
                                   <LocateFixed className="w-3 h-3 text-emerald-600" />
-                                  {t('slot.distanceKm', language, { dist: mandi.distance_km })}
+                                  {mandi.distance_km} km (approx. straight-line)
                                 </span>
                                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 flex items-center gap-1">
                                   <Truck className="w-3 h-3 text-amber-700" />
@@ -562,22 +633,54 @@ export default function SlotBookingPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto pr-1">
                   {slotTimes.map((slot, index) => {
                     const isSelected = selectedSlotIndex === index;
+                    const todayIST = toLocalISODate();
+                    const isToday = selectedDateIso === todayIST;
+                    const [curH, curM] = getISTCurrentTime();
+                    const curMinutes = curH * 60 + curM;
+
+                    const [sH, sM] = slot.start.split(':').map(Number);
+                    const slotMinutes = (isNaN(sH) ? 0 : sH) * 60 + (isNaN(sM) ? 0 : sM);
+                    const isPast = isToday && slotMinutes <= curMinutes;
+
+                    const capacity = selectedMandi?.slot_capacity || 6;
+                    const bookedInSlot = mandiDateBookings.filter(
+                      (b) => b.slot_start_time === slot.start && (b.status === 'waiting' || b.status === 'active')
+                    ).length;
+                    const remaining = Math.max(0, capacity - bookedInSlot);
+                    const isFull = remaining === 0;
+                    const isDisabled = isPast || isFull;
+
                     return (
                       <button
                         type="button"
                         key={slot.start}
+                        disabled={isDisabled}
                         onClick={() => setSelectedSlotIndex(index)}
                         className={`p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between ${
-                          isSelected
+                          isDisabled
+                            ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200 text-gray-400'
+                            : isSelected
                             ? 'border-primary-800 bg-primary-100 text-primary-950 font-bold shadow-sm'
                             : 'border-primary-100 bg-white hover:border-primary-300 text-primary-800'
                         }`}
                       >
                         <div>
                           <p className="text-sm font-bold leading-tight">{slot.label}</p>
-                          <small className="text-[11px] text-emerald-700 font-semibold">{t('slot.available', language)}</small>
+                          {isPast ? (
+                            <small className="text-[11px] text-gray-400 font-semibold">
+                              {t('slot.pastSlot', language) || 'Past slot'}
+                            </small>
+                          ) : isFull ? (
+                            <small className="text-[11px] text-red-600 font-semibold">
+                              {t('slot.slotFull', language) || `Full (0 of ${capacity} left)`}
+                            </small>
+                          ) : (
+                            <small className="text-[11px] text-emerald-700 font-semibold">
+                              {remaining} of {capacity} left
+                            </small>
+                          )}
                         </div>
-                        {isSelected && <Check className="w-4 h-4 text-primary-800 shrink-0" />}
+                        {isSelected && !isDisabled && <Check className="w-4 h-4 text-primary-800 shrink-0" />}
                       </button>
                     );
                   })}

@@ -11,8 +11,6 @@ import {
   EyeOff,
   CheckCircle2,
   XCircle,
-  AlertCircle,
-  Sparkles,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -20,7 +18,6 @@ import { t } from '@/lib/translations';
 import InputField from '@/components/shared/InputField';
 import PrimaryButton from '@/components/shared/PrimaryButton';
 import AlertMessage from '@/components/shared/AlertMessage';
-import { parseRegisteredFarmers } from '@/lib/registered-farmers';
 
 interface RegisterFormProps {
   onSwitchToLogin?: () => void;
@@ -90,7 +87,6 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   }, [password]);
 
   const metCount = passwordRules.filter((r) => r.met).length;
-  const isStrongPassword = metCount === 5;
 
   // Password Strength Meter styling
   const strengthMeter = useMemo(() => {
@@ -190,95 +186,50 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             },
           },
         });
-
-        // If that fails with user already registered or provider error, also try 10 digits
-        if (authResponse.error && authResponse.error.message.includes('already registered')) {
-          const retryRaw = await supabase.auth.signUp({
-            phone: tenDigits,
-            password: password,
-            options: {
-              data: {
-                full_name: fullName.trim(),
-              },
-            },
-          });
-          if (!retryRaw.error) {
-            authResponse = retryRaw;
-          }
-        }
       }
 
       const { data, error } = authResponse;
 
-      // Record profile in local storage under ALL possible lookup formats for 100% login reliability
-      try {
-        if (typeof window !== 'undefined') {
-          const record = {
-            fullName: fullName.trim(),
-            password: password,
-            identifier: isEmail ? cleanEmail : tenDigits,
-            phone: isEmail ? undefined : formattedPhone,
-            email: isEmail ? cleanEmail : undefined,
-            registeredAt: new Date().toISOString(),
-          };
+      if (error) {
+        setAlert({ type: 'error', message: error.message });
+        setLoading(false);
+        return;
+      }
 
-          if (isEmail) {
-            localStorage.setItem(`km_pw_${cleanEmail}`, password);
-            localStorage.setItem(`km_reg_${cleanEmail}`, JSON.stringify(record));
-            localStorage.setItem(`km_reg_${identifier.trim()}`, JSON.stringify(record));
-          } else {
-            localStorage.setItem(`km_pw_${tenDigits}`, password);
-            localStorage.setItem(`km_pw_${formattedPhone}`, password);
-            localStorage.setItem(`km_pw_${identifier.trim()}`, password);
-            localStorage.setItem(`km_reg_${formattedPhone}`, JSON.stringify(record));
-            localStorage.setItem(`km_reg_${tenDigits}`, JSON.stringify(record));
-            localStorage.setItem(`km_reg_${identifier.trim()}`, JSON.stringify(record));
-          }
-
-          // Append to registered farmers list
-          const list = parseRegisteredFarmers(localStorage.getItem('km_registered_farmers'));
-          // Update existing or add new
-          const existingIdx = list.findIndex((u) =>
-            isEmail 
-              ? u.email === cleanEmail 
-              : u.phone?.replace(/\D/g, '').slice(-10) === tenDigits
-          );
-          if (existingIdx >= 0) {
-            list[existingIdx] = record;
-          } else {
-            list.push(record);
-          }
-          localStorage.setItem('km_registered_farmers', JSON.stringify(list));
-
-          // Save identifier to auto-fill on login screen
-          localStorage.setItem('km_last_registered_identifier', isEmail ? cleanEmail : tenDigits);
-
-          // Auto-establish user session so the farmer is immediately logged in!
-          const userObj = {
-            id: data?.user?.id || ('farmer-' + (isEmail ? cleanEmail.replace(/[^a-z0-9]/g, '') : tenDigits)),
-            phone: isEmail ? null : formattedPhone,
-            email: isEmail ? cleanEmail : null,
-            user_metadata: {
+      // Upsert profile in Supabase farmers table
+      if (data?.user) {
+        try {
+          await supabase.from('farmers').upsert(
+            {
+              user_id: data.user.id,
               full_name: fullName.trim(),
-              name: fullName.trim(),
+              mobile_number: isEmail ? (data.user.phone || '') : formattedPhone,
+              preferred_language: language,
             },
-          };
-          localStorage.setItem('km_user_session', JSON.stringify(userObj));
-          window.dispatchEvent(new Event('km_auth_change'));
+            { onConflict: 'user_id' }
+          );
+        } catch (dbErr: unknown) {
+          console.warn('Could not insert farmers table record:', dbErr);
         }
-      } catch {}
+      }
 
       setAlert({
         type: 'success',
         message: t('register.success', language),
       });
 
-      // Auto-redirect to home or switch to login
+      // Auto-redirect to home if session established, otherwise to login
       setTimeout(() => {
-        router.push('/');
-        router.refresh();
+        if (data?.session) {
+          router.push('/');
+          router.refresh();
+        } else if (onSwitchToLogin) {
+          onSwitchToLogin();
+        } else {
+          router.push('/login');
+        }
       }, 1000);
-    } catch (err) {
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t('error.generic', language);
       setAlert({ type: 'error', message: msg });
     } finally {

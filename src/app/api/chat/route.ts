@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { toLocalISODate } from '@/lib/date-utils';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limiter';
+import { getMSPForCommodity } from '@/lib/msp-config';
+import { createClient, hasValidSupabaseConfig } from '@/lib/supabase/server';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
-export interface MarketRecord {
+interface MarketRecord {
   commodity: string;
   market: string;
   state: string;
@@ -18,6 +22,42 @@ export interface MarketRecord {
 
 const RESOURCE_ID = '9ef84268-d588-465a-a308-a864a43d0070';
 const MARKET_API_URL = `https://api.data.gov.in/resource/${RESOURCE_ID}`;
+
+const saveChatInteraction = async (
+  userMessage: string,
+  assistantMessage: string,
+  language: string
+) => {
+  if (!hasValidSupabaseConfig()) return;
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from('chat_messages').insert([
+      {
+        user_id: user?.id ?? null,
+        role: 'user',
+        content: userMessage,
+        language,
+      },
+      {
+        user_id: user?.id ?? null,
+        role: 'assistant',
+        content: assistantMessage,
+        language,
+      },
+    ]);
+
+    if (error) {
+      logger.error('Failed to save chat interaction to Supabase', error);
+    }
+  } catch (error) {
+    logger.error('Unable to connect chat to Supabase', error);
+  }
+};
 
 // ─── Sanitized Structured Logging ───────────────────────────────────────────
 const maskKey = (key?: string): string => {
@@ -39,7 +79,7 @@ const logger = {
 };
 
 // ─── Comprehensive Multi-Commodity Indian APMC & e-NAM Dataset ─────────────
-const TODAY_STR = new Date().toISOString().split('T')[0];
+const TODAY_STR = toLocalISODate();
 
 const COMPREHENSIVE_COMMODITY_DATABASE: MarketRecord[] = [
   // 1. TOMATO (टमाटर / टोमॅटो)
@@ -426,8 +466,6 @@ const COMPREHENSIVE_COMMODITY_DATABASE: MarketRecord[] = [
     unit: '₹/टन (FRP 10.25% recovery)',
   },
 ];
-
-export const DEV_MOCK_COMMODITY_PRICES = COMPREHENSIVE_COMMODITY_DATABASE;
 
 // ─── Commodity Matcher Dictionary ───────────────────────────────────────────
 type CommodityMatcher = {
@@ -1171,6 +1209,8 @@ const generateGeneralAiResponse = (query: string, lang: string): string => {
 const fetchLiveMandiRecordsWithRetry = async (): Promise<{
   records: MarketRecord[];
   source: string;
+  isLive: boolean;
+  sampleDate?: string;
   error?: string;
 }> => {
   const apiKey = process.env.DATA_GOV_API_KEY;
@@ -1179,7 +1219,9 @@ const fetchLiveMandiRecordsWithRetry = async (): Promise<{
   if (isDevMode || !apiKey || apiKey.includes('your_') || apiKey.length < 10) {
     return {
       records: COMPREHENSIVE_COMMODITY_DATABASE,
-      source: isDevMode ? 'Mandi Feed (Developer Mode Simulation)' : 'Kisan Mitra Market Baseline',
+      source: `Sample Mandi Dataset (As of ${TODAY_STR}) - Offline Baseline`,
+      isLive: false,
+      sampleDate: TODAY_STR,
     };
   }
 
@@ -1226,6 +1268,7 @@ const fetchLiveMandiRecordsWithRetry = async (): Promise<{
           const arrivalQuantity =
             Number(String(r.arrivals_in_qtl || r.Arrivals_in_Qtl || '0').replace(/,/g, '')) || 0;
           const date = String(r.arrival_date || r.Arrival_Date || TODAY_STR).trim();
+          const mspRecord = getMSPForCommodity(commodity);
 
           return {
             commodity,
@@ -1237,6 +1280,7 @@ const fetchLiveMandiRecordsWithRetry = async (): Promise<{
             modalPrice,
             arrivalQuantity,
             date,
+            msp: mspRecord?.mspPerQuintal,
           };
         })
         .filter((r) => r.commodity && r.modalPrice > 0);
@@ -1246,6 +1290,7 @@ const fetchLiveMandiRecordsWithRetry = async (): Promise<{
         return {
           records: combined,
           source: 'data.gov.in (Live Government Agmarknet API)',
+          isLive: true,
         };
       }
     } catch (err: unknown) {
@@ -1258,7 +1303,9 @@ const fetchLiveMandiRecordsWithRetry = async (): Promise<{
 
   return {
     records: COMPREHENSIVE_COMMODITY_DATABASE,
-    source: 'Kisan Mitra Market Baseline',
+    source: `Sample Mandi Dataset (As of ${TODAY_STR}) - Offline Baseline`,
+    isLive: false,
+    sampleDate: TODAY_STR,
   };
 };
 
@@ -1288,12 +1335,28 @@ export async function POST(request: Request) {
   const startTime = Date.now();
 
   try {
+    // 1. IP Rate Limiting (H13)
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(`chat:${ip}`, 20, 3600);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `सवाल पूछने की सीमा समाप्त हो गई है (20 सवाल प्रति घंटा)। कृपया ${rateCheck.resetSeconds} सेकंड बाद पुनः प्रयास करें। Rate limit exceeded (20 queries/hour).`,
+        },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(rateCheck.resetSeconds) },
+        }
+      );
+    }
+
     const body = (await request.json()) as { messages?: ChatMessage[]; language?: string };
     const messages = (body.messages || [])
       .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content?.trim())
       .slice(-10);
 
-    const latestMessage = messages.at(-1)?.content || '';
+    const latestMessage = messages.at(-1)?.content?.trim() || '';
     const userLanguage = body.language || 'hi';
 
     if (!latestMessage) {
@@ -1303,18 +1366,29 @@ export async function POST(request: Request) {
       );
     }
 
+    // 2. Length Capping (H13)
+    if (latestMessage.length > 500) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'सवाल 500 अक्षरों से अधिक लंबा नहीं होना चाहिए। Query length must not exceed 500 characters.',
+        },
+        { status: 400 }
+      );
+    }
+
     logger.info(`Received chat query: "${latestMessage.slice(0, 60)}..."`, {
       language: userLanguage,
       historyLength: messages.length,
     });
 
-    // 1. Fetch live or dev market records
-    const { records, source } = await fetchLiveMandiRecordsWithRetry();
+    // 3. Fetch live or fallback market records (H14)
+    const { records, source, isLive, sampleDate } = await fetchLiveMandiRecordsWithRetry();
 
     const isDevMode = process.env.DEV_MODE === 'true';
     const openAiApiKey = process.env.OPENAI_API_KEY;
 
-    // 2. Intelligent Mini ChatGPT Routing Engine
+    // 4. Intelligent Mini ChatGPT Routing Engine
     const matchedCommodity = detectCommodity(latestMessage);
     const userWantsPrice = isPriceQuery(latestMessage);
     const userWantsWeather = isWeatherQuery(latestMessage);
@@ -1345,12 +1419,16 @@ export async function POST(request: Request) {
         responseText = generateGeneralAiResponse(latestMessage, userLanguage);
       }
 
+      await saveChatInteraction(latestMessage, responseText, userLanguage);
+
       return NextResponse.json({
         success: true,
         answer: responseText,
         message: responseText,
-        grounded: true,
-        source: isDevMode ? 'Kisan Mitra AI (Developer Mode Mini ChatGPT)' : `${source} + AI Engine`,
+        grounded: isLive,
+        source: isDevMode
+          ? `Kisan Mitra AI (Developer Mode - Sample Data as of ${sampleDate || TODAY_STR})`
+          : `${source} + AI Engine`,
         devMode: isDevMode,
         commodityData: matchedCommodity
           ? records.filter((r) =>
@@ -1361,7 +1439,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Production Mode: Call OpenAI with Live Market Grounding as Mini ChatGPT
+    // 5. Production Mode: Call OpenAI with Live Market Grounding as Mini ChatGPT
     const relevantRecords = matchedCommodity
       ? records.filter((r) =>
           matchedCommodity.aliases.some((a) => r.commodity.toLowerCase().includes(a.toLowerCase()))
@@ -1369,7 +1447,7 @@ export async function POST(request: Request) {
       : records.slice(0, 20);
 
     const marketContext = relevantRecords.length
-      ? `ताज़ा सरकारी मंडी डेटा:\n${JSON.stringify(relevantRecords, null, 2)}`
+      ? `ताज़ा सरकारी मंडी डेटा (${isLive ? 'Live data.gov.in' : `Sample data as of ${sampleDate || TODAY_STR}`}):\n${JSON.stringify(relevantRecords, null, 2)}`
       : 'मंडी डेटा वर्तमान में सामान्य दर पर उपलब्ध है।';
 
     logger.info('Forwarding query to OpenAI GPT with grounded context', {
@@ -1408,11 +1486,13 @@ export async function POST(request: Request) {
         else if (userWantsSchemes) fallbackText = generateSchemesResponse(latestMessage, userLanguage);
         else fallbackText = generateGeneralAiResponse(latestMessage, userLanguage);
 
+        await saveChatInteraction(latestMessage, fallbackText, userLanguage);
+
         return NextResponse.json({
           success: true,
           answer: fallbackText,
           message: fallbackText,
-          grounded: true,
+          grounded: isLive,
           source: `${source} (Built-in Fallback)`,
           commodityData: relevantRecords.slice(0, 4),
           responseTimeMs: Date.now() - startTime,
@@ -1432,11 +1512,13 @@ export async function POST(request: Request) {
         responseTimeMs: Date.now() - startTime,
       });
 
+      await saveChatInteraction(latestMessage, aiAnswer, userLanguage);
+
       return NextResponse.json({
         success: true,
         answer: aiAnswer,
         message: aiAnswer,
-        grounded: true,
+        grounded: isLive,
         source: `${source} + Sahayak AI`,
         commodityData: relevantRecords.slice(0, 4),
         responseTimeMs: Date.now() - startTime,
@@ -1451,11 +1533,13 @@ export async function POST(request: Request) {
       else if (userWantsSchemes) directAnswer = generateSchemesResponse(latestMessage, userLanguage);
       else directAnswer = generateGeneralAiResponse(latestMessage, userLanguage);
 
+      await saveChatInteraction(latestMessage, directAnswer, userLanguage);
+
       return NextResponse.json({
         success: true,
         answer: directAnswer,
         message: directAnswer,
-        grounded: true,
+        grounded: isLive,
         source: `${source} (Built-in AI Engine)`,
         commodityData: relevantRecords.slice(0, 4),
         responseTimeMs: Date.now() - startTime,

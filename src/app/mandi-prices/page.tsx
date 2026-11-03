@@ -1,31 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   TrendingUp,
   TrendingDown,
   Calendar,
-  AlertTriangle,
   CheckCircle2,
-  Clock,
   Sparkles,
   ArrowRight,
   ShieldAlert,
-  Truck,
   Building2,
-  DollarSign,
   ChevronRight,
-  BarChart3,
   Flame,
-  Info,
   Scale,
   Wheat,
   Apple,
   Carrot,
   Leaf,
   Layers,
-  HelpCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import PageContainer from '@/components/shared/PageContainer';
@@ -38,7 +31,6 @@ import { getMandis } from '@/lib/mandi-service';
 import {
   COMMODITIES,
   CommodityCategory,
-  CommodityItem,
   MandiCropPrice,
   getMandiPrices,
   getSellingAdvisory,
@@ -69,8 +61,21 @@ export default function MandiPricesAdvisorPage() {
   const [advisoryResult, setAdvisoryResult] = useState<SellingAdvisoryResult | null>(null);
   const [loadingAdvisory, setLoadingAdvisory] = useState(false);
 
+  const loadMandis = useCallback(async (lat?: number, lng?: number) => {
+    setLoadingMandis(true);
+    try {
+      const list = await getMandis(lat, lng);
+      setMandis(list);
+      setSelectedMandiId((prev) => prev || (list[0]?.id ?? ''));
+    } catch {
+      // ignore
+    } finally {
+      setLoadingMandis(false);
+    }
+  }, []);
+
   // Load Mandis list & geolocation on mount
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     setLocationStatus('prompting');
     setLocationError(null);
 
@@ -95,28 +100,25 @@ export default function MandiPricesAdvisorPage() {
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
-  };
+  }, [loadMandis]);
 
-  const loadMandis = async (lat?: number, lng?: number) => {
-    setLoadingMandis(true);
-    try {
-      const list = await getMandis(lat, lng);
-      setMandis(list);
-      if (list.length > 0 && !selectedMandiId) {
-        setSelectedMandiId(list[0].id);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoadingMandis(false);
+  const handleDistrictSelect = useCallback((coords: { lat: number; lng: number } | null) => {
+    if (coords) {
+      setUserLocation(coords);
+      setLocationStatus('granted');
+      loadMandis(coords.lat, coords.lng);
+    } else {
+      setUserLocation(null);
+      loadMandis(undefined, undefined);
     }
-  };
+  }, [loadMandis]);
 
   useEffect(() => {
-    // Geolocation is a browser API; its result initializes the page after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    requestLocation();
-  }, []);
+    const timer = setTimeout(() => {
+      requestLocation();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [requestLocation]);
 
   const selectedMandi = useMemo(() => {
     return mandis.find((m) => m.id === selectedMandiId) || mandis[0] || null;
@@ -212,6 +214,7 @@ export default function MandiPricesAdvisorPage() {
             locationStatus={locationStatus}
             locationError={locationError}
             onRequestLocation={requestLocation}
+            onSelectDistrict={handleDistrictSelect}
             loading={loadingMandis}
             quantityQuintals={Number(quantityInput) || 20}
             title={t('advisor.selectMandiTitle', language)}

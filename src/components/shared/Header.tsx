@@ -8,7 +8,6 @@ import {
   Menu,
   X,
   LogOut,
-  User,
   ChevronDown,
   Calendar,
   LifeBuoy,
@@ -52,7 +51,6 @@ export default function Header() {
   }, [pathname]);
 
   const isMandiOperator = Boolean(mandiSession);
-  const isFarmer = Boolean(user && !mandiSession);
 
   // Role-gated navigation links:
   // - Farmers: slot booking and tracking only (mandi portal hidden/inaccessible)

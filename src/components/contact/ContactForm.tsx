@@ -24,9 +24,7 @@ interface FormData {
 
 const INITIAL: FormData = { farmerName: '', mobile: '', messageType: '', message: '' };
 
-const SCRIPT_URL =
-  process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL ||
-  'https://script.google.com/macros/s/AKfycbyUXQnzKCyxUQMeuouHRUPMG1TYUi4Kb9MKuFR_hDjbdNUK7kDKxM02joW-R1S6GizJPw/exec';
+const SCRIPT_URL = process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL || '';
 
 // Direct client fallback to Google Sheet (no-cors)
 const directPushToSheet = (data: FormData) => {

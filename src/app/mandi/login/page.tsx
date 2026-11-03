@@ -6,11 +6,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   Building2,
-  CheckCircle2,
   Lock,
-  Mail,
-  ShieldCheck,
-  Sprout,
   Warehouse,
 } from 'lucide-react';
 import PageContainer from '@/components/shared/PageContainer';
@@ -47,19 +43,6 @@ export default function MandiLoginPage() {
     }
   };
 
-  const handleQuickDemo = async (code: string) => {
-    setIdentifier(code);
-    setPassword('demo123');
-    setLoading(true);
-    const res = await loginMandi(code, 'demo123');
-    if (res.session) {
-      router.push('/mandi/dashboard');
-    } else {
-      setError(res.error || 'Demo login failed.');
-      setLoading(false);
-    }
-  };
-
   return (
     <PageContainer>
       <div className="max-w-md mx-auto py-8">
@@ -72,36 +55,6 @@ export default function MandiLoginPage() {
           <p className="text-xs text-primary-700 mt-1">
             Access your live APMC token queue, weighbridge slots, and delay logs.
           </p>
-        </div>
-
-        {/* Quick Demo Logins */}
-        <div className="mb-6 p-4 rounded-2xl bg-white border border-primary-200 shadow-sm">
-          <p className="text-xs font-bold text-primary-800 uppercase tracking-wider mb-2.5">
-            Quick One-Click Demo Credentials:
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('APMC-PUN-01')}
-              className="px-2.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition-colors text-center"
-            >
-              Pune APMC
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('APMC-BRM-02')}
-              className="px-2.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition-colors text-center"
-            >
-              Baramati
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('APMC-AHM-03')}
-              className="px-2.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition-colors text-center"
-            >
-              Ahmednagar
-            </button>
-          </div>
         </div>
 
         {/* Sign In Form */}

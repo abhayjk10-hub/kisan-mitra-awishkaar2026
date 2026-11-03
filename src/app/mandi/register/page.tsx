@@ -6,15 +6,8 @@ import Link from 'next/link';
 import {
   ArrowRight,
   Building2,
-  CheckCircle2,
   Clock3,
-  Compass,
   LocateFixed,
-  Lock,
-  Mail,
-  MapPin,
-  Phone,
-  ShieldCheck,
   User,
   Warehouse,
 } from 'lucide-react';

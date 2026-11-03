@@ -44,12 +44,8 @@ function getQuickReplies(lang: Language) {
   ];
 }
 
-function getGreeting(lang: string) {
-  if (lang === 'hi') return 'नमस्ते! मैं किसान मित्र AI हूँ। मंडी भाव, स्लॉट बुकिंग, या किसी भी सवाल में मैं आपकी मदद कर सकता हूँ। आप बोल भी सकते हैं! 🎤';
-  if (lang === 'mr') return 'नमस्कार! मी किसान मित्र AI आहे. मंडी भाव, स्लॉट बुकिंग किंवा कोणत्याही प्रश्नासाठी मी मदत करू शकतो. आपण बोलू शकता! 🎤';
-  if (lang === 'pa') return 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਕਿਸਾਨ ਮਿੱਤਰ AI ਹਾਂ। ਮੰਡੀ ਭਾਅ, ਸਲਾਟ ਬੁਕਿੰਗ ਜਾਂ ਕਿਸੇ ਵੀ ਸਵਾਲ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਸੀਂ ਬੋਲ ਵੀ ਸਕਦੇ ਹੋ! 🎤';
-  if (lang === 'gu') return 'નમસ્તે! હું કિસાન મિત્ર AI છું. મંડી ભાવ, સ્લોટ બુકિંગ અથવા કોઈપણ પ્રશ્ન માટે હું મદદ કરી શકું છું. તમે બોલી પણ શકો છો! 🎤';
-  return 'Namaste! I am Kisan Mitra AI. I can help with mandi prices, slot booking, and farming queries. You can also speak your question! 🎤';
+function getGreeting(lang: Language) {
+  return t('chat.greeting', lang);
 }
 
 function getLangCode(lang: string): string {

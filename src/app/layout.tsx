@@ -9,8 +9,8 @@ import TokenMarquee from '@/components/shared/TokenMarquee';
 
 export const metadata: Metadata = {
   title: 'Kisan Mitra — Farmer Procurement Queue & Status System',
-  description: 'Register, book slots, and track your procurement queue status. A Government of India initiative for farmers.',
-  keywords: 'kisan mitra, farmer procurement, slot booking, government scheme, MSP',
+  description: 'Register, book slots, and track your procurement queue status. An educational prototype for farmer slot booking and mandi queue management.',
+  keywords: 'kisan mitra, farmer procurement, slot booking, APMC, mandi queue, MSP',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

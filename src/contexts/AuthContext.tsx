@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { type AuthChangeEvent, type Session, type User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import { type User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
 interface AuthContextType {
@@ -21,98 +21,64 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  const syncUser = useCallback(async () => {
-    try {
-      // 1. Check Supabase active session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setLoading(false);
-        return;
-      }
-    } catch {}
-
-    // 2. Fallback to local user session
-    try {
-      if (typeof window !== 'undefined') {
-        const raw = localStorage.getItem('km_user_session');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && (parsed.id || parsed.phone || parsed.email)) {
-            setUser(parsed as User);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-    } catch {}
-
-    setUser(null);
-    setLoading(false);
-  }, [supabase]);
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    // Hydrate the auth state from Supabase and browser storage after mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    syncUser();
+    let isMounted = true;
 
-    // Listen to Supabase auth state changes
+    // Listen to Supabase auth state changes (automatically dispatches INITIAL_SESSION on mount)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        if (session?.user) {
-          setUser(session.user);
-          setLoading(false);
-        } else {
-          syncUser();
-        }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isMounted) {
+        setUser(session?.user ?? null);
+        setLoading(false);
       }
-    );
-
-    // Listen to custom km_auth_change and standard cross-tab storage events
-    const handleAuthEvent = () => {
-      syncUser();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('km_auth_change', handleAuthEvent);
-      window.addEventListener('storage', handleAuthEvent);
-    }
+    });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('km_auth_change', handleAuthEvent);
-        window.removeEventListener('storage', handleAuthEvent);
-      }
     };
-  }, [supabase, syncUser]);
+  }, [supabase]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-    } catch {}
-
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('km_user_session');
-        window.dispatchEvent(new Event('km_auth_change'));
-      }
-    } catch {}
-
+    } catch (err: unknown) {
+      console.error('[AuthContext] SignOut error:', err);
+    }
     setUser(null);
-  };
+  }, [supabase]);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, signOut, refreshUser: syncUser }}>
-      {children}
-    </AuthContext.Provider>
+  const refreshUser = useCallback(async () => {
+    try {
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+      setUser(currentUser ?? null);
+    } catch (err: unknown) {
+      console.error('[AuthContext] RefreshUser error:', err);
+    }
+  }, [supabase]);
+
+  const contextValue = useMemo(
+    () => ({
+      user,
+      loading,
+      signOut,
+      refreshUser,
+    }),
+    [user, loading, signOut, refreshUser]
   );
+
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }

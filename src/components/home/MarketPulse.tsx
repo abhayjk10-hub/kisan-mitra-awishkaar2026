@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { BarChart3, Database, RefreshCw } from 'lucide-react';
 import { ScrollReveal } from '@/components/shared/ArchiveMotion';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -157,19 +157,19 @@ export default function MarketPulse() {
   const [data, setData] = useState<MarketResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     fetch('/api/market-data')
       .then((response) => response.json() as Promise<MarketResponse>)
       .then(setData)
       .catch(() => setData({ success: false, message: t('error.network', language) }))
       .finally(() => setLoading(false));
-  };
+  }, [language]);
 
   useEffect(() => {
     const timer = window.setTimeout(loadData, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadData]);
 
   if (loading) {
     return (

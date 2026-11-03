@@ -40,6 +40,7 @@ export const pa: Translations = {
   // Login Page & Roles
   'login.title': 'ਕਿਸਾਨ ਮਿੱਤਰ ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ',
   'login.subtitle': 'ਅੱਗੇ ਵਧਣ ਲਈ ਆਪਣੇ ਰਜਿਸਟਰਡ ਮੋਬਾਈਲ ਨੰਬਰ ਜਾਂ ਪਾਸਵਰਡ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ।',
+  'login.mandiSubtitle': 'ਆਪਰੇਟਰ ਡੈਸ਼ਬੋਰਡ ਤੱਕ ਪਹੁੰਚਣ ਲਈ ਆਪਣੇ ਰਜਿਸਟਰਡ APMC ਵੇਰਵਿਆਂ ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ।',
   'login.farmerRole': '🌾 ਕਿਸਾਨ ਲਾਗਇਨ',
   'login.mandiRole': '🏛️ ਮੰਡੀ ਪੋਰਟਲ ਲਾਗਇਨ',
   'login.farmerRoleTitle': 'ਕਿਸਾਨ ਪ੍ਰਵੇਸ਼ ਪੋਰਟਲ',
@@ -377,7 +378,7 @@ export const pa: Translations = {
   // Footer
   'footer.quickLinks': 'ਜ਼ਰੂਰੀ ਲਿੰਕ',
   'footer.helpline': 'ਹੈਲਪਲਾਈਨ',
-  'footer.scheme': 'ਭਾਰਤ ਸਰਕਾਰ ਦੀ ਪਹਿਲਕਦਮੀ',
+  'footer.scheme': 'ਕਿਸਾਨ ਮਿੱਤਰ ਏਪੀਐਮਸੀ ਡੈਮੋ ਪੋਰਟਲ',
   'footer.rights': 'ਸਾਰੇ ਹੱਕ ਰਾਖਵੇਂ ਹਨ।',
   'footer.tagline': 'ਸੰਗਠਿਤ ਖੇਤੀਬਾੜੀ ਖਰੀਦ ਅਤੇ ਸਲਾਟ ਪ੍ਰਣਾਲੀ',
 
@@ -523,4 +524,20 @@ export const pa: Translations = {
   'transport.freightPerKm': 'ਦੂਰੀ ਟਰਾਂਜ਼ਿਟ ਭਾੜਾ',
   'transport.weightTonnageFee': 'ਵਜ਼ਨ ਆਧਾਰਿਤ ਭਾੜਾ ({qty} ਕੁਇੰਟਲ)',
   'transport.handlingFee': 'ਮੰਡੀ ਯਾਰਡ ਲਦਾਈ/ਲੁਹਾਈ ਖ਼ਰਚਾ ({qty} ਕੁਇੰਟਲ)',
+
+  // Added for M4 Completeness
+  'token.dismissConfirm': 'ਕੀ ਤੁਸੀਂ ਲਾਈਵ ਟੋਕਨ ਟ੍ਰੈਕਿੰਗ ਬੰਦ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?',
+  'crop.defaultWheat': 'ਕਣਕ (Wheat)',
+  'chat.greeting': 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਕਿਸਾਨ ਮਿੱਤਰ AI ਹਾਂ। ਮੰਡੀ ਭਾਅ, ਸਲਾਟ ਬੁਕਿੰਗ ਜਾਂ ਕਿਸੇ ਵੀ ਸਵਾਲ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ। ਤੁਸੀਂ ਬੋਲ ਵੀ ਸਕਦੇ ਹੋ! 🎤',
+  'mandi.gatewayEyebrow': 'ਏਪੀਐਮਸੀ ਮੰਡੀ ਪ੍ਰਸ਼ਾਸਨ',
+  'mandi.gatewayHeading': 'ਮੰਡੀ ਟੋਕਨ ਪ੍ਰਬੰਧਨ ਅਤੇ ਲਾਈਵ ਗੇਟ ਓਪਰੇਸ਼ਨ',
+  'mandi.gatewaySubheading': 'ਰੀਅਲ-ਟਾਈਮ ਸਲਾਟ ਟਰੈਕਿੰਗ, 30 ਮਿੰਟ ਕਤਾਰ ਪ੍ਰਬੰਧਨ, ਵਾਕ-ਇਨ ਕਿਸਾਨ ਗੇਟ ਐਂਟਰੀ ਅਤੇ ਪਾਰਦਰਸ਼ੀ ਮੰਡੀ ਕੰਮਕਾਜ।',
+  'mandi.signInBtn': 'ਮੰਡੀ ਲਾਗਇਨ',
+  'mandi.registerBtn': 'ਨਵੀਂ ਏਪੀਐਮਸੀ ਮੰਡੀ ਰਜਿਸਟਰ ਕਰੋ',
+  'slot.selectDistrict': 'ਜ਼ਿਲ੍ਹਾ ਖ਼ੁਦ ਚੁਣੋ',
+  'slot.allDistricts': 'ਸਾਰੇ ਜ਼ਿਲ੍ਹੇ / GPS ਵਰਤੋ',
+  'slot.manualDistrictActive': 'ਜ਼ਿਲ੍ਹਾ ਚੁਣਿਆ ਗਿਆ: {district}',
+  'transport.approxStraightLine': '(ਅੰਦਾਜ਼ਨ ਸਿੱਧੀ ਦੂਰੀ)',
+  'transport.locationRequired': 'ਟਿਕਾਣਾ ਲੋੜੀਂਦਾ',
+  'advisor.locationNeededForTransport': 'ਮੰਡੀ ਤੁਲਨਾ ਲਈ ਢੋਆ-ਢੁਆਈ ਖਰਚ ਦੀ ਗਣਨਾ ਲਈ ਆਪਣਾ ਜ਼ਿਲ੍ਹਾ ਚੁਣੋ ਜਾਂ GPS ਚਾਲੂ ਕਰੋ।',
 };

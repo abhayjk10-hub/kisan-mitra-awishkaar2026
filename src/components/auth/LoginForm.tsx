@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Smartphone, Lock, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -9,7 +9,6 @@ import { t } from '@/lib/translations';
 import InputField from '@/components/shared/InputField';
 import PrimaryButton from '@/components/shared/PrimaryButton';
 import AlertMessage from '@/components/shared/AlertMessage';
-import { parseRegisteredFarmers, type RegisteredFarmerRecord } from '@/lib/registered-farmers';
 import ForgotPasswordFlow from '@/components/auth/ForgotPasswordFlow';
 
 type ActiveView = 'login' | 'forgot-password';
@@ -20,27 +19,20 @@ export default function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: 
   const supabase = createClient();
 
   const [activeView, setActiveView] = useState<ActiveView>('login');
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return localStorage.getItem('km_last_registered_identifier') || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [errors, setErrors] = useState<{ identifier?: string; password?: string }>({});
-
-  // Auto-prefill identifier if farmer just registered or reset password
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const last = localStorage.getItem('km_last_registered_identifier');
-        if (last && !identifier) {
-          // The saved identifier is browser-only state and must be read after hydration.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setIdentifier(last);
-        }
-      }
-    } catch {}
-  }, []);
 
   const validateIdentifier = (val: string): boolean => {
     const trimmed = val.trim();
@@ -127,118 +119,17 @@ export default function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: 
 
       const { data, error } = authResponse || {};
 
-      if (!error && data?.user) {
-        // Successful Supabase authentication
-        const userObj = {
-          id: data.user.id,
-          phone: data.user.phone || (isEmail ? null : formattedPhone),
-          email: data.user.email || (isEmail ? cleanEmail : null),
-          user_metadata: data.user.user_metadata || {
-            full_name: 'Registered Farmer',
-            name: 'Registered Farmer',
-          },
-        };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('km_user_session', JSON.stringify(userObj));
-          window.dispatchEvent(new Event('km_auth_change'));
-        }
-
-        setAlert({ type: 'success', message: 'Login successful! Redirecting to Home page...' });
-        setTimeout(() => {
-          router.push('/');
-          router.refresh();
-        }, 700);
-        return;
+      if (error || !data?.user) {
+        throw new Error(error?.message || t('forgot.accountNotFound', language));
       }
 
-      // If Supabase returned error or phone format mismatch, check local registration and password store
-      let matchedRecord: RegisteredFarmerRecord | null = null;
-      let matchedStoredPassword: string | null = null;
-
-      if (typeof window !== 'undefined') {
-        const keysToTry = isEmail
-          ? [`km_pw_${cleanEmail}`, `km_reg_${cleanEmail}`, `km_reg_${identifier.trim()}`]
-          : [
-              `km_pw_${tenDigits}`,
-              `km_pw_${formattedPhone}`,
-              `km_pw_${identifier.trim()}`,
-              `km_reg_${tenDigits}`,
-              `km_reg_${formattedPhone}`,
-              `km_reg_${identifier.trim()}`,
-            ];
-
-        for (const k of keysToTry) {
-          const item = localStorage.getItem(k);
-          if (item) {
-            try {
-              if (item.startsWith('{')) {
-                const parsed = JSON.parse(item);
-                if (parsed.password) {
-                  matchedRecord = parsed;
-                  matchedStoredPassword = parsed.password;
-                  break;
-                }
-              } else {
-                matchedRecord = { fullName: 'Farmer' };
-                matchedStoredPassword = item;
-                break;
-              }
-            } catch {}
-          }
-        }
-
-        if (!matchedStoredPassword) {
-          try {
-            const list = parseRegisteredFarmers(localStorage.getItem('km_registered_farmers'));
-            if (list.length > 0) {
-              const found = list.find((u) =>
-                isEmail
-                  ? u.email === cleanEmail || u.identifier === cleanEmail
-                  : u.phone?.replace(/\D/g, '').slice(-10) === tenDigits ||
-                    u.identifier?.replace(/\D/g, '').slice(-10) === tenDigits
-              );
-              if (found?.password) {
-                matchedRecord = found;
-                matchedStoredPassword = found.password;
-              }
-            }
-          } catch {
-            // Ignore malformed cached registration data and continue with other login formats.
-          }
-        }
-      }
-
-      if (matchedStoredPassword) {
-        if (matchedStoredPassword === password) {
-          // Password verified against user registration or reset!
-          const userObj = {
-            id: 'farmer-' + (isEmail ? cleanEmail.replace(/[^a-z0-9]/g, '') : tenDigits),
-            phone: isEmail ? null : formattedPhone,
-            email: isEmail ? cleanEmail : null,
-            user_metadata: {
-              full_name: matchedRecord?.fullName || 'Registered Farmer',
-              name: matchedRecord?.fullName || 'Registered Farmer',
-            },
-          };
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('km_user_session', JSON.stringify(userObj));
-            window.dispatchEvent(new Event('km_auth_change'));
-          }
-
-          setAlert({ type: 'success', message: t('login.success', language) });
-          setTimeout(() => {
-            router.push('/');
-            router.refresh();
-          }, 700);
-          return;
-        } else {
-          throw new Error(t('error.generic', language));
-        }
-      }
-
-      // If no local record found either, report clear actionable message
-      throw new Error(t('forgot.accountNotFound', language));
-    } catch (err) {
+      setAlert({ type: 'success', message: t('login.success', language) });
+      setTimeout(() => {
+        router.push('/');
+        router.refresh();
+      }, 700);
+      return;
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('error.generic', language);
       setAlert({ type: 'error', message });
     } finally {

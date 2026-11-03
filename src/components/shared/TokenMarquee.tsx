@@ -33,10 +33,10 @@ export default function TokenMarquee() {
 
   const handleDismiss = useCallback(() => {
     if (token?.status === 'now' || token?.status === 'approaching') {
-      if (!window.confirm('Dismiss token tracking?')) return;
+      if (!window.confirm(t('token.dismissConfirm', language))) return;
     }
     clearToken();
-  }, [token, clearToken]);
+  }, [token, clearToken, language]);
 
   if (!token) return null;
 

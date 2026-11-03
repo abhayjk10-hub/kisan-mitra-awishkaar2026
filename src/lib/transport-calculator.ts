@@ -9,14 +9,6 @@ export interface GeoLocation {
 }
 
 /**
- * Geographic coordinates (latitude and longitude).
- */
-export interface GeoLocation {
-  latitude: number;
-  longitude: number;
-}
-
-/**
  * Quantity-Aware Agricultural Transport Economics Configuration
  * In Indian rural logistics, flat per-km rates fail because moving 10 tonnes of grain
  * requires distinct commercial vehicle classes, fuel burn, driver wages, and loading labor.
@@ -90,6 +82,10 @@ export interface TransportCostOptions {
 export interface TransportCostResult {
   /** Distance in kilometers (accurate Haversine calculation) */
   distanceKm: number;
+  /** Straight-line geodesic distance marker */
+  straightLineDistanceKm: number;
+  /** Flag denoting distance is geodesic/straight-line, not road driving distance */
+  isApproximateStraightLine: boolean;
   /** Quantity of produce in quintals */
   quantityQuintals: number;
   /** Recommended vehicle tier */
@@ -289,7 +285,7 @@ export function calculateTransportationCost(
     maximumFractionDigits: 1,
   })}/Qtl`;
 
-  const formattedDistance = `${distanceKm.toFixed(1)} km`;
+  const formattedDistance = `${distanceKm.toFixed(1)} km (approx. straight-line)`;
   const formattedRate = `₹${effectiveRatePerKm}${t('transport.perKm', language)}`;
 
   const summary = t('transport.summary', language, {
@@ -303,6 +299,8 @@ export function calculateTransportationCost(
 
   return {
     distanceKm,
+    straightLineDistanceKm: distanceKm,
+    isApproximateStraightLine: true,
     quantityQuintals: qty,
     vehicle,
     ratePerKm: effectiveRatePerKm,

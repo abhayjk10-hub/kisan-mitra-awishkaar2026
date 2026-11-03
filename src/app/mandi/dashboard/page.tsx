@@ -2,46 +2,28 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   AlertTriangle,
-  ArrowRight,
-  Bell,
-  Building2,
-  Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
   Clock,
   Clock3,
-  Copy,
-  Database,
-  Eye,
-  FileSpreadsheet,
-  Filter,
-  History,
   LogOut,
-  MapPin,
   Phone,
-  Plus,
-  Printer,
   RefreshCw,
   Search,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
-  Sprout,
   Truck,
   User,
-  UserCheck,
   UserPlus,
-  Users,
   Warehouse,
   Wheat,
   X,
-  Zap,
 } from 'lucide-react';
 import PageContainer from '@/components/shared/PageContainer';
+import { toLocalISODate } from '@/lib/date-utils';
 import {
   Mandi,
   MandiSession,
@@ -57,6 +39,7 @@ import {
   createWalkinToken,
   getAllFarmerDelays,
   getFarmerDelays,
+  logFarmerDelay,
   subscribeToMandiQueue,
   logoutMandi,
   loginMandi,
@@ -71,7 +54,7 @@ export default function MandiDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // Queue Data
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate());
   const [queue, setQueue] = useState<SlotBooking[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | SlotStatus>('all');
@@ -104,10 +87,6 @@ export default function MandiDashboardPage() {
   // Inspection/Offense Detail Modal
   const [inspectPhone, setInspectPhone] = useState<string | null>(null);
   const [inspectDelays, setInspectDelays] = useState<FarmerDelay[]>([]);
-
-  // Supabase SQL Schema Modal
-  const [schemaModalOpen, setSchemaModalOpen] = useState(false);
-  const [copiedSchema, setCopiedSchema] = useState(false);
 
   // Notification Banner
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -151,13 +130,14 @@ export default function MandiDashboardPage() {
     }
   }, [session, selectedDate]);
 
+  const currentOperatorMandiId = session?.mandi?.id;
   useEffect(() => {
-    if (session?.mandi?.id) {
+    if (currentOperatorMandiId) {
       // This starts the queue refresh for the current operator and date.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       refreshQueue();
     }
-  }, [refreshQueue]);
+  }, [currentOperatorMandiId, refreshQueue]);
 
   // Real-Time Queue Subscription
   useEffect(() => {
@@ -219,12 +199,32 @@ export default function MandiDashboardPage() {
     if (!delayModalBooking) return;
     setLoggingDelay(true);
     try {
-      await updateTokenStatus(delayModalBooking.id, delayType === 'no_show' ? 'no-show' : 'waiting', {
-        delay_minutes: parseInt(delayMinutes, 10) || 30,
-        reason: delayReason,
-        reported_by: `${session?.mandi?.name || 'Mandi'} Gate Operator`,
-        penalty_points: delayType === 'no_show' ? 2 : 1,
-      });
+      const parsedDelay = parseInt(delayMinutes, 10);
+      const delayMins = isNaN(parsedDelay) ? 30 : parsedDelay;
+      const penalty = delayType === 'no_show' ? 2 : 1;
+
+      if (delayType === 'late_arrival') {
+        // H11: Logging a late arrival in mandi/dashboard/page.tsx must NOT change the booking status. Only record the delay.
+        await logFarmerDelay({
+          booking_id: delayModalBooking.id,
+          farmer_phone: delayModalBooking.farmer_phone,
+          farmer_name: delayModalBooking.farmer_name,
+          mandi_id: delayModalBooking.mandi_id,
+          mandi_name: delayModalBooking.mandi_name,
+          delay_type: 'late_arrival',
+          delay_minutes: delayMins,
+          penalty_points: penalty,
+          reason: delayReason || 'Delayed arrival at market yard gate',
+          reported_by: `${session?.mandi?.name ?? 'Mandi'} Gate Operator`,
+        });
+      } else {
+        await updateTokenStatus(delayModalBooking.id, 'no-show', {
+          delay_minutes: delayMins,
+          reason: delayReason,
+          reported_by: `${session?.mandi?.name ?? 'Mandi'} Gate Operator`,
+          penalty_points: penalty,
+        });
+      }
       setDelayModalBooking(null);
       refreshQueue();
     } finally {
@@ -354,16 +354,6 @@ export default function MandiDashboardPage() {
 
           {/* Right Action Controls */}
           <div className="flex flex-wrap items-center gap-2.5 self-start md:self-center">
-            {/* Supabase Schema Helper */}
-            <button
-              type="button"
-              onClick={() => setSchemaModalOpen(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-800 bg-primary-100 hover:bg-primary-200 px-3.5 py-2 rounded-xl transition-colors"
-            >
-              <Database className="w-3.5 h-3.5 text-primary-700" />
-              <span>SQL Schema</span>
-            </button>
-
             {/* Switch Mandi Dropdown */}
             <div className="relative">
               <select
@@ -1102,111 +1092,6 @@ export default function MandiDashboardPage() {
                     </div>
                   ))
                 )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 4: SUPABASE SQL SCHEMA VIEWER */}
-        {schemaModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary-950/80 backdrop-blur-sm animate-in fade-in">
-            <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl border border-primary-200 overflow-hidden relative animate-in zoom-in-95">
-              <div className="bg-primary-950 text-white p-6 relative">
-                <button
-                  type="button"
-                  onClick={() => setSchemaModalOpen(false)}
-                  className="absolute top-4 right-4 text-white/80 hover:text-white p-1"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                  <Database className="w-4 h-4 text-emerald-400" />
-                  Supabase Schema Migration
-                </div>
-                <h3 className="display-font text-2xl font-bold mt-1 text-white">Database Setup SQL</h3>
-                <p className="text-xs text-primary-300 mt-1">
-                  Run this in your Supabase SQL Editor to initialize tables, RLS policies, and realtime publications.
-                </p>
-              </div>
-
-              <div className="p-6">
-                <div className="relative">
-                  <pre className="p-4 rounded-xl bg-primary-900 text-emerald-300 font-mono text-xs max-h-72 overflow-y-auto overflow-x-auto">
-{`-- KISAN MITRA SUPABASE SCHEMA
-CREATE TABLE IF NOT EXISTS mandis (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  code TEXT UNIQUE NOT NULL,
-  district TEXT NOT NULL,
-  address TEXT NOT NULL,
-  latitude DOUBLE PRECISION NOT NULL,
-  longitude DOUBLE PRECISION NOT NULL,
-  slot_capacity INTEGER DEFAULT 6,
-  opening_time TIME DEFAULT '06:00',
-  closing_time TIME DEFAULT '18:00',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS slot_bookings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  token_number TEXT NOT NULL,
-  mandi_id UUID REFERENCES mandis(id),
-  mandi_name TEXT NOT NULL,
-  farmer_name TEXT NOT NULL,
-  farmer_phone TEXT NOT NULL,
-  crop_name TEXT NOT NULL,
-  quantity_quintals NUMERIC DEFAULT 10,
-  vehicle_number TEXT,
-  booking_date DATE NOT NULL,
-  slot_start_time TIME NOT NULL,
-  slot_end_time TIME NOT NULL,
-  status TEXT DEFAULT 'waiting',
-  is_walkin BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS farmer_delays (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  booking_id UUID REFERENCES slot_bookings(id),
-  farmer_phone TEXT NOT NULL,
-  farmer_name TEXT NOT NULL,
-  mandi_id UUID REFERENCES mandis(id),
-  mandi_name TEXT NOT NULL,
-  delay_type TEXT NOT NULL,
-  delay_minutes INTEGER DEFAULT 0,
-  penalty_points INTEGER DEFAULT 1,
-  reason TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER PUBLICATION supabase_realtime ADD TABLE slot_bookings;
-ALTER PUBLICATION supabase_realtime ADD TABLE farmer_delays;
-ALTER PUBLICATION supabase_realtime ADD TABLE mandis;`}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS mandis (...);`);
-                      setCopiedSchema(true);
-                      setTimeout(() => setCopiedSchema(false), 2000);
-                    }}
-                    className="absolute top-3 right-3 text-xs bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    {copiedSchema ? 'Copied!' : 'Copy SQL'}
-                  </button>
-                </div>
-
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setSchemaModalOpen(false)}
-                    className="px-5 py-2 rounded-xl bg-primary-900 text-white font-bold text-sm"
-                  >
-                    Done
-                  </button>
-                </div>
               </div>
             </div>
           </div>

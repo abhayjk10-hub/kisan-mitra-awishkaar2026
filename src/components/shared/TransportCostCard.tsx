@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Truck, Navigation, Clock3, Fuel, Info, LocateFixed } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Truck, Navigation, Clock3, Info, LocateFixed } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/translations';
 import {
   calculateTransportationCost,
   DEFAULT_TRANSPORT_RATE,
-  MIN_TRANSPORT_RATE,
-  MAX_TRANSPORT_RATE,
   GeoLocation,
 } from '@/lib/transport-calculator';
 
@@ -35,7 +33,7 @@ export default function TransportCostCard({
   compact = false,
 }: TransportCostCardProps) {
   const { language } = useLanguage();
-  const [rate, setRate] = useState<number>(DEFAULT_TRANSPORT_RATE);
+  const rate = DEFAULT_TRANSPORT_RATE;
 
   // Derive calculation
   const calculation = useMemo(() => {
@@ -57,9 +55,10 @@ export default function TransportCostCard({
     });
   }, [farmerLocation, mandi.latitude, mandi.longitude, quantityQuintals, language]);
 
-  // Fallback if distance_km is pre-calculated but user location isn't exact
-  const fallbackDistance = mandi.distance_km ?? 15;
-  const fallbackCost = Math.round(fallbackDistance * rate);
+  // Only calculate fallback if distance_km was actually computed from valid coordinates
+  const hasPrecomputedDistance = typeof mandi.distance_km === 'number';
+  const fallbackDistance = hasPrecomputedDistance ? mandi.distance_km! : null;
+  const fallbackCost = fallbackDistance !== null ? Math.round(fallbackDistance * rate) : null;
 
   return (
     <div
@@ -90,7 +89,11 @@ export default function TransportCostCard({
               {t('transport.totalCost', language)}
             </span>
             <span className="text-lg sm:text-xl font-extrabold text-emerald-300">
-              {calculation ? calculation.formattedCost : `₹${fallbackCost}`}
+              {calculation
+                ? calculation.formattedCost
+                : fallbackCost !== null
+                ? `₹${fallbackCost}`
+                : '—'}
             </span>
           </div>
         </div>
@@ -119,7 +122,9 @@ export default function TransportCostCard({
               <strong className="text-xs font-bold text-white">
                 {calculation
                   ? calculation.formattedDistance
-                  : `${fallbackDistance.toFixed(1)} km`}
+                  : fallbackDistance !== null
+                  ? `${fallbackDistance.toFixed(1)} km (approx. straight-line)`
+                  : '—'}
               </strong>
             </div>
           </div>
@@ -133,7 +138,9 @@ export default function TransportCostCard({
               <strong className="text-xs font-bold text-white">
                 {calculation
                   ? calculation.formattedTransitTime
-                  : `${Math.round((fallbackDistance / 30) * 60)} ${t('transport.minsOnly', language, { mins: '' })}`}
+                  : fallbackDistance !== null
+                  ? `${Math.round((fallbackDistance / 30) * 60)} ${t('transport.minsOnly', language, { mins: '' })}`
+                  : '—'}
               </strong>
             </div>
           </div>
@@ -171,7 +178,7 @@ export default function TransportCostCard({
         {!compact && (
           <p className="text-[11px] text-primary-300/80 mt-3 flex items-center gap-1 leading-normal">
             <Info className="w-3.5 h-3.5 text-primary-400 shrink-0" />
-            <span>{calculation ? calculation.summary : t('transport.transitNote', language)}</span>
+            <span>{calculation ? calculation.summary : fallbackDistance !== null ? t('transport.transitNote', language) : t('transport.locationUnavailable', language)}</span>
           </p>
         )}
       </div>

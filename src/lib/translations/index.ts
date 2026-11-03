@@ -50,6 +50,7 @@ export const en: Translations = {
   // Login Page & Roles
   'login.title': 'Welcome to Kisan Mitra',
   'login.subtitle': 'Sign in with your registered mobile or password to proceed.',
+  'login.mandiSubtitle': 'Sign in with your registered APMC credentials to access the operator dashboard.',
   'login.farmerRole': 'Farmer Login',
   'login.mandiRole': 'Mandi Portal Login',
   'login.farmerRoleTitle': 'Farmer Access Portal',
@@ -150,6 +151,9 @@ export const en: Translations = {
   'slot.geoActiveDesc': 'Nearest APMC mandis sorted dynamically by distance from your current location.',
   'slot.geoDetectingDesc': 'Requesting browser location to find nearest agricultural mandis...',
   'slot.geoDefaultDesc': 'Displaying default sorted agricultural mandi network.',
+  'slot.selectDistrict': 'Select District Manually',
+  'slot.allDistricts': 'All Districts / Use GPS',
+  'slot.manualDistrictActive': 'Manual district selected: {district}',
   'slot.refreshGps': 'Refresh GPS',
   'slot.step1Title': 'Step 1 of 3',
   'slot.step1Heading': 'Select Nearby APMC Mandi',
@@ -357,6 +361,9 @@ export const en: Translations = {
   'transport.transitNote': 'Based on standard agri-cargo / tractor transit at 30 km/h',
   'transport.useLiveLocation': 'Use My Live GPS',
   'transport.locationUnavailable': 'Location unavailable. Enable GPS in browser.',
+  'transport.approxStraightLine': '(approx. straight-line)',
+  'transport.locationRequired': 'Location required',
+  'advisor.locationNeededForTransport': 'Select your district or enable GPS to calculate realistic transport costs for mandi comparison.',
 
   // Farmer Chatbot
   'chat.title': 'Kisan Mitra AI',
@@ -387,7 +394,7 @@ export const en: Translations = {
   // Footer
   'footer.quickLinks': 'Quick Links',
   'footer.helpline': 'Helpline',
-  'footer.scheme': 'Government of India Initiative',
+  'footer.scheme': 'APMC Queue & Slot Booking Demo',
   'footer.rights': 'All rights reserved.',
   'footer.tagline': 'Unified Agricultural Procurement Gateway',
 
@@ -533,6 +540,16 @@ export const en: Translations = {
   'transport.freightPerKm': 'Distance Transit Freight',
   'transport.weightTonnageFee': 'Cargo Load Freight ({qty} Qtl)',
   'transport.handlingFee': 'Yard Unloading Handling ({qty} Qtl)',
+
+  // Added for M4 Completeness
+  'token.dismissConfirm': 'Are you sure you want to dismiss live token tracking?',
+  'crop.defaultWheat': 'Wheat (गेहूं / गहू)',
+  'chat.greeting': 'Namaste! I am Kisan Mitra AI. I can help with mandi prices, slot booking, and farming queries. You can also speak your question! 🎤',
+  'mandi.gatewayEyebrow': 'APMC Market Yard Administration',
+  'mandi.gatewayHeading': 'Mandi Token Management & Live Gate Operations',
+  'mandi.gatewaySubheading': 'Real-time slot tracking, 30-minute queue management, walk-in farmer gate entry, and cross-mandi delay penalty accountability for APMC Mandis across India.',
+  'mandi.signInBtn': 'Mandi Sign In',
+  'mandi.registerBtn': 'Register New APMC Mandi',
 };
 
 export const hi: Translations = {
@@ -575,6 +592,7 @@ export const hi: Translations = {
   // Login Page & Roles
   'login.title': 'किसान मित्र में आपका स्वागत है',
   'login.subtitle': 'आगे बढ़ने के लिए अपने पंजीकृत मोबाइल नंबर या पासवर्ड से साइन इन करें।',
+  'login.mandiSubtitle': 'ऑपरेटर डैशबोर्ड तक पहुंचने के लिए अपने पंजीकृत APMC क्रेडेंशियल्स के साथ साइन इन करें।',
   'login.farmerRole': '🌾 किसान लॉगिन',
   'login.mandiRole': '🏛️ मंडी पोर्टल लॉगिन',
   'login.farmerRoleTitle': 'किसान प्रवेश पोर्टल',
@@ -675,6 +693,9 @@ export const hi: Translations = {
   'slot.geoActiveDesc': 'आपके वर्तमान स्थान से दूरी के अनुसार नजदीकी मंडियों की सूची।',
   'slot.geoDetectingDesc': 'निकटतम कृषि मंडियां खोजने के लिए स्थान की अनुमति ली जा रही है...',
   'slot.geoDefaultDesc': 'मानक क्रमबद्ध मंडी नेटवर्क प्रदर्शित किया जा रहा है।',
+  'slot.selectDistrict': 'जिला मैन्युअल रूप से चुनें',
+  'slot.allDistricts': 'सभी जिले / GPS उपयोग करें',
+  'slot.manualDistrictActive': 'मैन्युअल जिला चुना गया: {district}',
   'slot.refreshGps': 'GPS रीफ्रेश करें',
   'slot.step1Title': 'चरण 1 / 3',
   'slot.step1Heading': 'नजदीकी APMC मंडी चुनें',
@@ -882,6 +903,9 @@ export const hi: Translations = {
   'transport.transitNote': 'मानक कृषि कार्गो / ट्रैक्टर परिवहन (30 किमी/घंटा) पर आधारित',
   'transport.useLiveLocation': 'मेरा लाइव GPS उपयोग करें',
   'transport.locationUnavailable': 'स्थान उपलब्ध नहीं है। ब्राउज़र में GPS चालू करें।',
+  'transport.approxStraightLine': '(अनुमानित सीधी दूरी)',
+  'transport.locationRequired': 'स्थान आवश्यक',
+  'advisor.locationNeededForTransport': 'मंडी तुलना के लिए सटीक परिवहन खर्च की गणना हेतु अपना जिला चुनें या GPS चालू करें।',
 
   // Farmer Chatbot
   'chat.title': 'किसान मित्र AI',
@@ -912,7 +936,7 @@ export const hi: Translations = {
   // Footer
   'footer.quickLinks': 'त्वरित लिंक',
   'footer.helpline': 'हेल्पलाइन',
-  'footer.scheme': 'भारत सरकार की पहल',
+  'footer.scheme': 'किसान मित्र एपीएमसी डेमो पोर्टल',
   'footer.rights': 'सर्वाधिकार सुरक्षित।',
   'footer.tagline': 'एकीकृत कृषि खरीद एवं स्लॉट प्रणाली',
 
@@ -1058,6 +1082,16 @@ export const hi: Translations = {
   'transport.freightPerKm': 'दूरी पारगमन भाड़ा',
   'transport.weightTonnageFee': 'वजन आधारित भाड़ा ({qty} क्विंटल)',
   'transport.handlingFee': 'मंडी यार्ड हैंडलिंग शुल्क ({qty} क्विंटल)',
+
+  // Added for M4 Completeness
+  'token.dismissConfirm': 'क्या आप लाइव टोकन ट्रैकिंग बंद करना चाहते हैं?',
+  'crop.defaultWheat': 'गेहूं (Wheat)',
+  'chat.greeting': 'नमस्ते! मैं किसान मित्र AI हूँ। मंडी भाव, स्लॉट बुकिंग, या किसी भी सवाल में मैं आपकी मदद कर सकता हूँ। आप बोल भी सकते हैं! 🎤',
+  'mandi.gatewayEyebrow': 'एपीएमसी यार्ड प्रशासन',
+  'mandi.gatewayHeading': 'मंडी टोकन प्रबंधन एवं लाइव गेट संचालन',
+  'mandi.gatewaySubheading': 'वास्तविक समय स्लॉट ट्रैकिंग, 30-मिनट कतार प्रबंधन, वॉक-इन किसान गेट प्रविष्टि, और पारदर्शी एपीएमसी मंडी संचालन।',
+  'mandi.signInBtn': 'मंडी लॉगिन',
+  'mandi.registerBtn': 'नई एपीएमसी मंडी पंजीकृत करें',
 };
 
 import { mr } from './mr';

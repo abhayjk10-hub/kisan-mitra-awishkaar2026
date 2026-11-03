@@ -2,9 +2,7 @@
 
 import React from 'react';
 import { MandiCropPrice } from '@/lib/mandi-price-service';
-import { TrendingUp, TrendingDown, Minus, Building2, Flame } from 'lucide-react';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { t } from '@/lib/translations';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface MandiPriceTickerProps {
   prices: MandiCropPrice[];
@@ -12,8 +10,6 @@ interface MandiPriceTickerProps {
 }
 
 export default function MandiPriceTicker({ prices, mandiName }: MandiPriceTickerProps) {
-  const { language } = useLanguage();
-
   if (!prices || prices.length === 0) return null;
 
   // Duplicate items for continuous seamless loop

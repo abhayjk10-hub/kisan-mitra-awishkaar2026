@@ -1,107 +1,97 @@
 # Kisan Mitra — SIH26032
 
-Farmer Procurement Queue & Status System — A Government of India Initiative.
+Farmer Procurement Queue & APMC Slot Booking System (Educational & Demo Initiative)
 
-## Setup
+## Overview
 
-1. **Clone & Install**
-   ```bash
-   npm install
-   ```
+Kisan Mitra is an intelligent agricultural procurement queue management, slot booking, and price discovery platform built with Next.js 16, React 19, Tailwind CSS, and Supabase. It supports five languages: English (en), हिंदी (hi), मराठी (mr), ਪੰਜਾਬੀ (pa), and ગુજરાતી (gu).
 
-2. **Configure Supabase**
-   - Rename `.env.local` and fill in your credentials:
-     ```
-     NEXT_PUBLIC_SUPABASE_URL=your_url
-     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
-     ```
-   - Enable **Phone Auth** in Supabase Dashboard → Authentication → Providers → Phone
-  - Configure an SMS provider in Supabase Phone Auth (Twilio, MessageBird, or Vonage) so OTPs are delivered to the farmer&apos;s registered mobile number
-   - Create the `farmers` table (see schema below)
-   - Create the `contact_submissions` table (see schema below)
+> **Disclaimer**: This is a prototype and demonstration system developed for educational and hackathon purposes. Government schemes, MSP rates, and APMC yard listings are presented for demonstration and workflow modeling only.
 
-3. **Configure live government market data (optional but recommended)**
-  - Create an API key at [data.gov.in](https://data.gov.in/).
-  - Add it to `.env.local`:
-    ```
-    DATA_GOV_API_KEY=your_data_gov_api_key
-    MARKET_DATA_STATE=Maharashtra
-    OPENAI_API_KEY=your_openai_api_key
-    OPENAI_MODEL=gpt-4o-mini
-    ```
-    - The home page reads the Government of India mandi-price resource and shows modal-price and arrival-share charts with a source link and calculation method. Without the data key, it shows a clear connection state instead of sample data.
-    - The farmer chatbot uses the AI key only on the server and grounds market answers in the same data.gov.in feed. Without it, the assistant provides limited navigation guidance and does not invent prices.
+---
 
-4. **Run locally**
-   ```bash
-   npm run dev
-   ```
+## Setup & Local Development
 
-## Supabase Schema
-
-### farmers
-```sql
-create table farmers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) unique,
-  full_name text not null,
-  mobile_number text not null,
-  village text not null,
-  district text not null,
-  state text not null,
-  land_plot_id text not null,
-  preferred_language text not null default 'en',
-  created_at timestamptz default now()
-);
-
--- RLS
-alter table farmers enable row level security;
-create policy "Farmers can read own record" on farmers for select using (auth.uid() = user_id);
-create policy "Farmers can insert own record" on farmers for insert with check (auth.uid() = user_id);
-create policy "Farmers can update own record" on farmers for update using (auth.uid() = user_id);
+### 1. Clone & Install
+```bash
+npm install
 ```
 
-### contact_submissions
-```sql
-create table contact_submissions (
-  id uuid primary key default gen_random_uuid(),
-  farmer_name text not null,
-  mobile_number text not null,
-  message_type text not null check (message_type in ('Query', 'Suggestion', 'Grievance')),
-  message text not null,
-  synced_to_sheet boolean default false,
-  created_at timestamptz default now()
-);
-
--- RLS: allow inserts from anyone (public contact form), admins read via service role
-alter table contact_submissions enable row level security;
-create policy "Anyone can submit contact" on contact_submissions for insert with check (true);
+### 2. Environment Variables
+Copy `.env.example` to `.env.local`:
+```bash
+cp .env.example .env.local
 ```
+Fill in the required keys:
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side only)
+- `DATA_GOV_API_KEY` (from [data.gov.in](https://data.gov.in/) for live market prices)
+- `OPENAI_API_KEY` (for Sahayak AI chatbot grounding)
+- `GOOGLE_SCRIPT_URL` (for contact form Google Sheets integration)
+- `NEXT_PUBLIC_DEMO_MODE=false` (set to `true` only for offline/demo presentations)
+
+### 3. Supabase Migrations
+All database schemas, tables, constraints, and Row-Level Security (RLS) rules are managed as idempotent SQL files under `supabase/migrations/`. Execute them in the Supabase SQL Editor in the following order:
+
+1. `supabase/migrations/20261009_initial_schema.sql`
+   - Creates `farmers`, `mandis`, `slot_bookings`, `farmer_delays`, and `contact_submissions` tables.
+2. `supabase/migrations/20261103_security_and_rls_hardening.sql`
+   - Establishes strict Row-Level Security (RLS) ownership rules.
+   - Creates the `mandi_staff(user_id, mandi_id)` link table.
+   - Adds `updated_at` triggers and masked view `mandi_queue_masked_view`.
+3. `supabase/migrations/20261103_book_slot_capacity_and_token.sql`
+   - Atomic `book_slot(...)` stored procedure enforcing slot capacity under lock.
+   - Sequential token generation using Mandi code.
+   - Unique constraints preventing duplicate active bookings for the same phone/mandi/date and vehicle/slot window.
+   - Atomic `cancel_farmer_slot(...)` procedure with 1-day advance validation and automatic waitlist promotion.
+
+### 4. Run Locally
+```bash
+npm run dev
+```
+
+### 5. Running Tests
+```bash
+npm test
+```
+
+---
+
+## Supported Languages
+- English (`en`)
+- हिंदी (`hi`)
+- मराठी (`mr`)
+- ਪੰਜਾਬੀ (`pa`)
+- ગુજરાતી (`gu`)
+
+---
 
 ## Project Structure
 
 ```
 src/
-├── app/                    # Next.js App Router pages
-│   ├── layout.tsx          # Root layout (Header + Footer)
-│   ├── page.tsx            # Home page
-│   ├── login/page.tsx      # Login / Register page
-│   ├── contact/page.tsx    # Contact page
-│   └── slot-booking/       # Slot booking (placeholder)
+├── app/                    # Next.js App Router
+│   ├── api/                # Secure API route handlers (chat, contact)
+│   ├── config-error/       # Missing environment configuration screen
+│   ├── mandi/              # Mandi operator dashboard & login
+│   ├── mandi-prices/       # Live APMC commodity price charts
+│   ├── slot-booking/       # Farmer 30-minute unloading slot booking
+│   ├── login/              # Farmer Supabase Auth (Phone OTP & Password)
+│   └── contact/            # Support and grievance submission
 ├── components/
-│   ├── shared/             # Reusable design system components
-│   ├── auth/               # LoginForm, RegisterForm
-│   └── contact/            # ContactForm
-├── contexts/               # AuthContext, LanguageContext
+│   ├── auth/               # LoginForm, RegisterForm, ForgotPasswordFlow
+│   ├── contact/            # ContactForm
+│   └── shared/             # Reusable UI cards, Navbar, Marquee, Footer
+├── contexts/
+│   ├── AuthContext.tsx     # Supabase Auth session provider
+│   ├── LanguageContext.tsx # 5-language i18n context
+│   └── TokenContext.tsx    # Live Realtime farmer token tracker
 ├── lib/
-│   ├── supabase/           # Supabase client (browser + server)
-│   └── translations/       # i18n strings (EN, HI, MR, PA, GU)
-└── types/                  # Shared TypeScript types
+│   ├── date-utils.ts       # IST (Asia/Kolkata) date helpers
+│   ├── rate-limiter.ts     # In-memory sliding window rate limiter
+│   ├── msp-config.ts       # Centralized CACP Minimum Support Prices
+│   ├── mandi-service.ts    # Mandi operations, queues, cancellations
+│   ├── supabase/           # Browser & server Supabase clients
+│   └── translations/       # Multi-lingual dictionary strings
+└── types/                  # Shared TypeScript interfaces
 ```
-
-## Supported Languages
-- English (en)
-- हिंदी (hi)
-- मराठी (mr)
-- ਪੰਜਾਬੀ (pa)
-- ગુજરાતી (gu)

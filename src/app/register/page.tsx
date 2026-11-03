@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Sprout,
   Warehouse,
-  ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';

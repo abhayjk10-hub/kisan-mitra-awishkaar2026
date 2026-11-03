@@ -40,6 +40,7 @@ export const gu: Translations = {
   // Login Page & Roles
   'login.title': 'કિસાન મિત્રમાં આપનું સ્વાગત છે',
   'login.subtitle': 'આગળ વધવા માટે તમારા નોંધાયેલા મોબાઇલ નંબર અથવા પાસવર્ડથી સાઇન ઇન કરો.',
+  'login.mandiSubtitle': 'ઑપરેટર ડૅશબોર્ડ ઍક્સેસ કરવા માટે તમારા નોંધાયેલા APMC ઓળખપત્રો સાથે સાઇન ઇન કરો.',
   'login.farmerRole': '🌾 ખેડૂત લૉગિન',
   'login.mandiRole': '🏛️ મંડી પોર્ટલ લૉગિન',
   'login.farmerRoleTitle': 'ખેડૂત પ્રવેશ પોર્ટલ',
@@ -377,7 +378,7 @@ export const gu: Translations = {
   // Footer
   'footer.quickLinks': 'ઝડપી લિંક્સ',
   'footer.helpline': 'હેલ્પલાઇન',
-  'footer.scheme': 'ભારત સરકારની પહેલ',
+  'footer.scheme': 'કિસાન મિત્ર એપીએમસી ડેમો પોર્ટલ',
   'footer.rights': 'સર્વાધિકાર સુરક્ષિત.',
   'footer.tagline': 'સંકલિત કૃષિ ખરીદી અને સ્લોટ સિસ્ટમ',
 
@@ -523,4 +524,20 @@ export const gu: Translations = {
   'transport.freightPerKm': 'અંતર ટ્રાન્ઝિટ ભાડું',
   'transport.weightTonnageFee': 'વજન આધારિત ભાડું ({qty} ક્વિન્ટલ)',
   'transport.handlingFee': 'માર્કેટ યાર્ડ હેન્ડલિંગ/મજૂરી ({qty} ક્વિન્ટલ)',
+
+  // Added for M4 Completeness
+  'token.dismissConfirm': 'શું તમે લાઇવ ટોકન ટ્રેકિંગ બંધ કરવા માંગો છો?',
+  'crop.defaultWheat': 'ઘઉં (Wheat)',
+  'chat.greeting': 'નમસ્તે! હું કિસાન મિત્ર AI છું. મંડી ભાવ, સ્લોટ બુકિંગ અથવા કોઈપણ પ્રશ્ન માટે હું મદદ કરી શકું છું. તમે બોલી પણ શકો છો! 🎤',
+  'mandi.gatewayEyebrow': 'એપીએમસી માર્કેટ યાર્ડ વહીવટ',
+  'mandi.gatewayHeading': 'મંડી ટોકન મેનેજમેન્ટ અને લાઈવ ગેટ કામગીરી',
+  'mandi.gatewaySubheading': 'રીઅલ-ટાઇમ સ્લોટ ટ્રેકિંગ, 30 મિનિટ કતાર વ્યવસ્થાપન, વોક-ઇન ખેડૂત ગેટ એન્ટ્રી અને પારદર્શક એપીએમસી કામગીરી.',
+  'mandi.signInBtn': 'મંડી લૉગિન',
+  'mandi.registerBtn': 'નવી એપીએમસી મંડી રજીસ્ટર કરો',
+  'slot.selectDistrict': 'જિલ્લો મેન્યુઅલી પસંદ કરો',
+  'slot.allDistricts': 'બધા જિલ્લા / GPS વાપરો',
+  'slot.manualDistrictActive': 'મેન્યુઅલ જિલ્લો પસંદ કર્યો: {district}',
+  'transport.approxStraightLine': '(અંદાજિત સીધું અંતર)',
+  'transport.locationRequired': 'સ્થાન જરૂરી',
+  'advisor.locationNeededForTransport': 'મંડી સરખામણી માટે વાસ્તવિક પરિવહન ખર્ચની ગણતરી કરવા માટે તમારો જિલ્લો પસંદ કરો અથવા GPS ચાલુ કરો.',
 };

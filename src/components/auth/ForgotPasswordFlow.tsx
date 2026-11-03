@@ -9,13 +9,14 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/translations';
 import InputField from '@/components/shared/InputField';
 import PrimaryButton from '@/components/shared/PrimaryButton';
 import AlertMessage from '@/components/shared/AlertMessage';
-import { parseRegisteredFarmers } from '@/lib/registered-farmers';
 
 interface ForgotPasswordFlowProps {
   initialIdentifier?: string;
@@ -29,9 +30,11 @@ export default function ForgotPasswordFlow({
   onCancel,
 }: ForgotPasswordFlowProps) {
   const { language } = useLanguage();
+  const supabase = createClient();
 
   const [step, setStep] = useState<'identify' | 'reset' | 'completed'>('identify');
   const [identifier, setIdentifier] = useState(initialIdentifier.trim());
+  const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -41,6 +44,7 @@ export default function ForgotPasswordFlow({
   const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [errors, setErrors] = useState<{
     identifier?: string;
+    otpCode?: string;
     newPassword?: string;
     confirmPassword?: string;
   }>({});
@@ -55,9 +59,9 @@ export default function ForgotPasswordFlow({
   };
 
   /* ─────────────────────────────────────────────────────────────────────────
-   * STEP 1: IDENTIFY USER (Mobile number or Email)
+   * STEP 1: IDENTIFY USER & DISPATCH REAL AUTH CHALLENGE
    * ───────────────────────────────────────────────────────────────────────── */
-  const handleIdentify = (e: React.FormEvent) => {
+  const handleIdentify = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
 
@@ -73,16 +77,62 @@ export default function ForgotPasswordFlow({
     }
 
     setErrors({});
-    setStep('reset');
+    setLoading(true);
     setAlert(null);
+
+    const isEmail = identifier.includes('@');
+    const cleanEmail = identifier.trim().toLowerCase();
+    const digits = identifier.trim().replace(/\D/g, '');
+    const tenDigits = digits.slice(-10);
+    const formattedPhone = '+91' + tenDigits;
+
+    try {
+      if (isEmail) {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+        if (error) {
+          setAlert({ type: 'error', message: error.message });
+          return;
+        }
+        setStep('completed');
+        setAlert({
+          type: 'success',
+          message: 'Password reset link sent to your email address.',
+        });
+        setTimeout(() => {
+          onSuccess(cleanEmail);
+        }, 2000);
+      } else {
+        const { error } = await supabase.auth.signInWithOtp({
+          phone: formattedPhone,
+        });
+        if (error) {
+          setAlert({ type: 'error', message: error.message });
+          return;
+        }
+        setStep('reset');
+        setAlert({
+          type: 'info',
+          message: `OTP sent to ${formattedPhone}. Enter the code below to reset password.`,
+        });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('error.generic', language);
+      setAlert({ type: 'error', message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ─────────────────────────────────────────────────────────────────────────
-   * STEP 2: RESET PASSWORD
+   * STEP 2: VERIFY OTP & RESET PASSWORD THROUGH SUPABASE AUTH
    * ───────────────────────────────────────────────────────────────────────── */
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
+
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      newErrors.otpCode = t('validation.invalid.otp', language);
+    }
 
     if (!newPassword) {
       newErrors.newPassword = t('forgot.newPassword', language);
@@ -104,45 +154,31 @@ export default function ForgotPasswordFlow({
     setLoading(true);
     setAlert(null);
 
+    const digits = identifier.trim().replace(/\D/g, '');
+    const tenDigits = digits.slice(-10);
+    const formattedPhone = '+91' + tenDigits;
+
     try {
-      if (typeof window !== 'undefined') {
-        const isEmail = identifier.includes('@');
-        const cleanEmail = identifier.trim().toLowerCase();
-        const digits = identifier.trim().replace(/\D/g, '');
-        const tenDigits = digits.slice(-10);
-        const formattedPhone = '+91' + tenDigits;
+      // 1. Verify OTP token using Supabase Phone Auth
+      const { error: otpErr } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: otpCode.trim(),
+        type: 'sms',
+      });
 
-        if (isEmail) {
-          localStorage.setItem(`km_pw_${cleanEmail}`, newPassword);
-          localStorage.setItem(`km_reg_${cleanEmail}`, JSON.stringify({ fullName: 'Farmer', password: newPassword, email: cleanEmail }));
-        } else {
-          localStorage.setItem(`km_pw_${tenDigits}`, newPassword);
-          localStorage.setItem(`km_pw_${formattedPhone}`, newPassword);
-          localStorage.setItem(`km_pw_${identifier.trim()}`, newPassword);
-          localStorage.setItem(`km_reg_${tenDigits}`, JSON.stringify({ fullName: 'Farmer', password: newPassword, phone: formattedPhone }));
-          localStorage.setItem(`km_reg_${formattedPhone}`, JSON.stringify({ fullName: 'Farmer', password: newPassword, phone: formattedPhone }));
-        }
+      if (otpErr) {
+        setAlert({ type: 'error', message: otpErr.message || t('validation.invalid.otp', language) });
+        return;
+      }
 
-        // Update entry in km_registered_farmers list
-        const list = parseRegisteredFarmers(localStorage.getItem('km_registered_farmers'));
-        const existingIdx = list.findIndex((u) =>
-          isEmail
-            ? u.email === cleanEmail || u.identifier === cleanEmail
-            : u.phone?.replace(/\D/g, '').slice(-10) === tenDigits || u.identifier === tenDigits
-        );
-        if (existingIdx >= 0) {
-          list[existingIdx].password = newPassword;
-        } else {
-          list.push({
-            fullName: 'Farmer',
-            password: newPassword,
-            identifier: isEmail ? cleanEmail : tenDigits,
-            phone: isEmail ? undefined : formattedPhone,
-            email: isEmail ? cleanEmail : undefined,
-            updatedAt: new Date().toISOString(),
-          });
-        }
-        localStorage.setItem('km_registered_farmers', JSON.stringify(list));
+      // 2. Set new password on verified Supabase user
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateErr) {
+        setAlert({ type: 'error', message: updateErr.message });
+        return;
       }
 
       setStep('completed');
@@ -154,8 +190,9 @@ export default function ForgotPasswordFlow({
       setTimeout(() => {
         onSuccess(identifier.trim());
       }, 1500);
-    } catch {
-      setAlert({ type: 'error', message: t('error.generic', language) });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('error.generic', language);
+      setAlert({ type: 'error', message });
     } finally {
       setLoading(false);
     }
@@ -214,13 +251,13 @@ export default function ForgotPasswordFlow({
             autoComplete="username"
           />
 
-          <PrimaryButton type="submit" fullWidth size="lg">
+          <PrimaryButton type="submit" fullWidth loading={loading} size="lg">
             {t('register.next', language)}
           </PrimaryButton>
         </form>
       )}
 
-      {/* ── STEP 2: SET NEW PASSWORD ── */}
+      {/* ── STEP 2: ENTER OTP & SET NEW PASSWORD ── */}
       {step === 'reset' && (
         <form onSubmit={handleResetPassword} noValidate className="space-y-4">
           <div className="text-center space-y-1">
@@ -231,6 +268,22 @@ export default function ForgotPasswordFlow({
               {identifier}
             </p>
           </div>
+
+          <InputField
+            id="reset-otp-code"
+            label="6-Digit OTP Code"
+            type="text"
+            placeholder="e.g. 654321"
+            value={otpCode}
+            onChange={(e) => {
+              setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+              setErrors((prev) => ({ ...prev, otpCode: undefined }));
+            }}
+            error={errors.otpCode}
+            icon={<KeyRound className="w-4 h-4" />}
+            required
+            autoComplete="one-time-code"
+          />
 
           <InputField
             id="reset-new-password"

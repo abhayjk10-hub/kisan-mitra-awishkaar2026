@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Compass,
   MapPin,
@@ -8,12 +8,12 @@ import {
   Check,
   LocateFixed,
   Truck,
-  Building2,
 } from 'lucide-react';
 import { Mandi } from '@/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/translations';
 import { calculateTransportationCost, GeoLocation } from '@/lib/transport-calculator';
+import { SUPPORTED_DISTRICTS } from '@/lib/districts';
 
 interface MandiSelectorProps {
   mandis: Mandi[];
@@ -23,6 +23,7 @@ interface MandiSelectorProps {
   locationStatus: 'prompting' | 'granted' | 'denied' | 'error';
   locationError: string | null;
   onRequestLocation: () => void;
+  onSelectDistrict?: (coords: { lat: number; lng: number } | null, districtName?: string) => void;
   loading?: boolean;
   quantityQuintals?: number;
   title?: string;
@@ -37,12 +38,14 @@ export default function MandiSelector({
   locationStatus,
   locationError,
   onRequestLocation,
+  onSelectDistrict,
   loading = false,
   quantityQuintals = 15,
   title,
   subtitle,
 }: MandiSelectorProps) {
   const { language } = useLanguage();
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>('');
 
   return (
     <div className="space-y-4">
@@ -61,7 +64,11 @@ export default function MandiSelector({
                 : t('slot.geoAccess', language)}
             </p>
             <p className="text-sm font-semibold text-primary-950">
-              {locationStatus === 'granted'
+              {selectedDistrictId
+                ? t('slot.manualDistrictActive', language, {
+                    district: SUPPORTED_DISTRICTS.find((d) => d.id === selectedDistrictId)?.name || '',
+                  })
+                : locationStatus === 'granted'
                 ? t('slot.geoActiveDesc', language)
                 : locationStatus === 'prompting'
                 ? t('slot.geoDetectingDesc', language)
@@ -69,14 +76,43 @@ export default function MandiSelector({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onRequestLocation}
-          className="self-start sm:self-center inline-flex items-center gap-2 text-xs font-bold text-primary-800 hover:text-primary-950 bg-primary-100 hover:bg-primary-200 px-3.5 py-2 rounded-xl transition-colors shrink-0"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>{t('slot.refreshGps', language)}</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-center flex-wrap">
+          <select
+            value={selectedDistrictId}
+            onChange={(e) => {
+              const distId = e.target.value;
+              setSelectedDistrictId(distId);
+              if (!distId) {
+                onSelectDistrict?.(null);
+              } else {
+                const dist = SUPPORTED_DISTRICTS.find((d) => d.id === distId);
+                if (dist) {
+                  onSelectDistrict?.({ lat: dist.latitude, lng: dist.longitude }, dist.name);
+                }
+              }
+            }}
+            className="text-xs font-semibold bg-white border border-primary-300 rounded-xl px-2.5 py-2 text-primary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            aria-label={t('slot.selectDistrict', language)}
+          >
+            <option value="">{t('slot.allDistricts', language)}</option>
+            {SUPPORTED_DISTRICTS.map((dist) => (
+              <option key={dist.id} value={dist.id}>
+                {dist.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDistrictId('');
+              onRequestLocation();
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-primary-800 hover:text-primary-950 bg-primary-100 hover:bg-primary-200 px-3 py-2 rounded-xl transition-colors shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>{t('slot.refreshGps', language)}</span>
+          </button>
+        </div>
       </div>
 
       {/* Mandi Cards List */}
@@ -140,7 +176,7 @@ export default function MandiSelector({
                         <>
                           <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 flex items-center gap-1">
                             <LocateFixed className="w-3 h-3 text-emerald-600" />
-                            {t('slot.distanceKm', language, { dist: mandi.distance_km })}
+                            {mandi.distance_km} km (approx. straight-line)
                           </span>
                           {estCost !== null && (
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 flex items-center gap-1">

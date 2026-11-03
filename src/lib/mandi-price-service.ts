@@ -1,7 +1,5 @@
-import { Mandi } from '@/types';
-import { DEFAULT_MANDIS, calculateDistanceKm } from './mandi-service';
+import { DEFAULT_MANDIS } from './mandi-service';
 import { calculateTransportationCost, GeoLocation } from './transport-calculator';
-import { Language, t } from './translations';
 
 export type CommodityCategory = 'grains_cereals' | 'pulses' | 'vegetables' | 'fruits';
 export type PerishabilityLevel = 'high' | 'medium' | 'low';
@@ -70,6 +68,7 @@ export interface CrossMandiComparison {
   netRevenue: number;
   isHighestNet: boolean;
   isNearest: boolean;
+  hasLocation?: boolean;
 }
 
 export interface SellingAdvisoryResult {
@@ -78,6 +77,7 @@ export interface SellingAdvisoryResult {
   currentMandiPrice: number;
   recommendation: 'SELL_NOW' | 'HOLD_HARVEST';
   confidence: 'High' | 'Medium' | 'Moderate';
+  hasLocation?: boolean;
   headlineKey: string;
   headline: string;
   isPerishabilityOverride: boolean;
@@ -521,9 +521,7 @@ export function getCrossMandiComparisons(
   farmerLocation?: { lat: number; lng: number } | null
 ): CrossMandiComparison[] {
   const base = BASE_COMMODITY_PRICES[commodityId] || { modal: 2500, min: 2200, max: 2800, arrivals: 800 };
-  const userLat = farmerLocation?.lat ?? 18.5204; // Default to central Maharashtra (Pune region)
-  const userLng = farmerLocation?.lng ?? 73.8567;
-  const farmerGeo: GeoLocation = { latitude: userLat, longitude: userLng };
+  const hasLocation = Boolean(farmerLocation && typeof farmerLocation.lat === 'number' && typeof farmerLocation.lng === 'number');
 
   const results: CrossMandiComparison[] = DEFAULT_MANDIS.map((mandi) => {
     const profile = MANDI_PROFILES[mandi.id] || { modalMultiplier: 1.0 };
@@ -534,26 +532,34 @@ export function getCrossMandiComparisons(
     const pricePerQuintal = Math.round(base.modal * mult);
     const grossRevenue = pricePerQuintal * quantityQuintals;
 
-    // Calculate transport cost with realistic quantity-aware calculator
-    const mandiGeo: GeoLocation = { latitude: mandi.latitude, longitude: mandi.longitude };
-    const transportResult = calculateTransportationCost(farmerGeo, mandiGeo, {
-      quantityQuintals,
-      roundDecimals: 0,
-    });
+    let transportCost = 0;
+    let distanceKm = 0;
 
-    const transportCost = transportResult.totalCost;
+    // Calculate transport cost with realistic quantity-aware calculator only when location is valid
+    if (hasLocation) {
+      const farmerGeo: GeoLocation = { latitude: farmerLocation!.lat, longitude: farmerLocation!.lng };
+      const mandiGeo: GeoLocation = { latitude: mandi.latitude, longitude: mandi.longitude };
+      const transportResult = calculateTransportationCost(farmerGeo, mandiGeo, {
+        quantityQuintals,
+        roundDecimals: 0,
+      });
+      transportCost = transportResult.totalCost;
+      distanceKm = transportResult.distanceKm;
+    }
+
     const netRevenue = Math.max(0, grossRevenue - transportCost);
 
     return {
       mandiId: mandi.id,
       mandiName: mandi.name,
-      distanceKm: transportResult.distanceKm,
+      distanceKm,
       pricePerQuintal,
       grossRevenue,
       transportCost,
       netRevenue,
       isHighestNet: false,
       isNearest: false,
+      hasLocation,
     };
   });
 
@@ -563,11 +569,13 @@ export function getCrossMandiComparisons(
     results[0].isHighestNet = true;
   }
 
-  // Find nearest
-  const nearest = [...results].sort((a, b) => a.distanceKm - b.distanceKm)[0];
-  if (nearest) {
-    const target = results.find((r) => r.mandiId === nearest.mandiId);
-    if (target) target.isNearest = true;
+  // Find nearest only when location is known
+  if (hasLocation) {
+    const nearest = [...results].sort((a, b) => a.distanceKm - b.distanceKm)[0];
+    if (nearest) {
+      const target = results.find((r) => r.mandiId === nearest.mandiId);
+      if (target) target.isNearest = true;
+    }
   }
 
   return results;
@@ -682,7 +690,7 @@ export async function getSellingAdvisory(
 
     reasoningPoints.push(
       `Perishability Priority: Shelf life is only ${commodity.shelfLifeDays} days in ambient conditions. Delaying harvest sales causes rapid spoilage and direct monetary loss.`,
-      `Optimal Market: Selling ${qty} quintals at ${bestMandi.mandiName} nets ₹${bestMandi.netRevenue.toLocaleString('en-IN')} after ₹${bestMandi.transportCost.toLocaleString('en-IN')} transport.`,
+      `Optimal Market: Selling ${qty} quintals at ${bestMandi.mandiName} nets ₹${bestMandi.netRevenue.toLocaleString('en-IN')}${selectedMandiData.hasLocation ? ` after ₹${bestMandi.transportCost.toLocaleString('en-IN')} transport` : ''}.`,
       `Harvest Protection: Even if future festive market prices rise by 5–10%, post-harvest rot will eliminate your profits.`
     );
   }
@@ -707,7 +715,7 @@ export async function getSellingAdvisory(
 
       reasoningPoints.push(
         `Market Stability: Current rates are competitive. Holding introduces storage rot risks without significant price upside.`,
-        `Net Payout: Transporting to ${bestMandi.mandiName} yields ₹${bestMandi.netRevenue.toLocaleString('en-IN')} net after freight costs.`
+        `Net Payout: Transporting to ${bestMandi.mandiName} yields ₹${bestMandi.netRevenue.toLocaleString('en-IN')} net${selectedMandiData.hasLocation ? ` after freight costs of ₹${bestMandi.transportCost.toLocaleString('en-IN')}` : ''}.`
       );
     }
   }
@@ -740,7 +748,13 @@ export async function getSellingAdvisory(
   if (bestMandi.mandiId !== selectedMandiData.mandiId) {
     const diff = bestMandi.netRevenue - selectedMandiData.netRevenue;
     reasoningPoints.push(
-      `Cross-Mandi Arbitrage: Choosing ${bestMandi.mandiName} instead of ${selectedMandiData.mandiName} yields +₹${diff.toLocaleString('en-IN')} higher net earnings even after accounting for distance transport of ₹${bestMandi.transportCost.toLocaleString('en-IN')}.`
+      `Cross-Mandi Arbitrage: Choosing ${bestMandi.mandiName} instead of ${selectedMandiData.mandiName} yields +₹${diff.toLocaleString('en-IN')} higher net earnings${selectedMandiData.hasLocation ? ` even after accounting for distance transport of ₹${bestMandi.transportCost.toLocaleString('en-IN')}` : ''}.`
+    );
+  }
+
+  if (!selectedMandiData.hasLocation) {
+    reasoningPoints.push(
+      'Transport Note: Location is not set. Transport deductions are excluded from revenue comparisons. Select your district or allow GPS to include transit expenses.'
     );
   }
 
@@ -763,6 +777,7 @@ export async function getSellingAdvisory(
     },
     crossMandiComparison: crossMandi,
     bestMandi,
+    hasLocation: selectedMandiData.hasLocation,
     reasoningPoints,
     netRevenueNow,
     projectedNetRevenueHold,

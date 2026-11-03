@@ -40,6 +40,7 @@ export const mr: Translations = {
   // Login Page & Roles
   'login.title': 'किसान मित्रमध्ये आपले स्वागत आहे',
   'login.subtitle': 'पुढे जाण्यासाठी आपल्या नोंदणीकृत मोबाईल नंबर किंवा पासवर्डने साइन इन करा.',
+  'login.mandiSubtitle': 'ऑपरेटर डॅशबोर्डमध्ये प्रवेश करण्यासाठी आपल्या नोंदणीकृत APMC क्रेडेन्शियल्ससह साइन इन करा.',
   'login.farmerRole': '🌾 शेतकरी लॉगिन',
   'login.mandiRole': '🏛️ मंडी पोर्टल लॉगिन',
   'login.farmerRoleTitle': 'शेतकरी प्रवेश पोर्टल',
@@ -377,7 +378,7 @@ export const mr: Translations = {
   // Footer
   'footer.quickLinks': 'जलद लिंक्स',
   'footer.helpline': 'हेल्पलाइन',
-  'footer.scheme': 'भारत सरकारचा उपक्रम',
+  'footer.scheme': 'किसान मित्र एपीएमसी डेमो पोर्टल',
   'footer.rights': 'सर्व हक्क राखीव.',
   'footer.tagline': 'एकीकृत कृषी खरेदी व स्लॉट प्रणाली',
 
@@ -523,4 +524,20 @@ export const mr: Translations = {
   'transport.freightPerKm': 'अंतरानुसार वाहतूक भाडे',
   'transport.weightTonnageFee': 'वजनानुसार भाडे ({qty} क्विंटल)',
   'transport.handlingFee': 'मंडी यार्ड हमाली/हँडलिंग शुल्क ({qty} क्विंटल)',
+
+  // Added for M4 Completeness
+  'token.dismissConfirm': 'तुम्हाला थेट टोकन ट्रॅकिंग बंद करायचे आहे का?',
+  'crop.defaultWheat': 'गहू (Wheat)',
+  'chat.greeting': 'नमस्कार! मी किसान मित्र AI आहे. मंडी भाव, स्लॉट बुकिंग किंवा कोणत्याही प्रश्नासाठी मी मदत करू शकतो. आपण बोलू शकता! 🎤',
+  'mandi.gatewayEyebrow': 'एपीएमसी मार्केट यार्ड प्रशासन',
+  'mandi.gatewayHeading': 'मंडी टोकन व्यवस्थापन आणि थेट गेट ऑपरेशन्स',
+  'mandi.gatewaySubheading': 'रिअल-टाइम स्लॉट ट्रॅकिंग, ३० मिनिटांचे रांग व्यवस्थापन, वॉक-इन शेतकरी गेट नोंदणी आणि पारदर्शक एपीएमसी कामकाज.',
+  'mandi.signInBtn': 'मंडी लॉगिन',
+  'mandi.registerBtn': 'नवीन एपीएमसी मंडी नोंदणी करा',
+  'slot.selectDistrict': 'जिल्हा मॅन्युअली निवडा',
+  'slot.allDistricts': 'सर्व जिल्हे / GPS वापरा',
+  'slot.manualDistrictActive': 'मॅन्युअल जिल्हा निवडला: {district}',
+  'transport.approxStraightLine': '(अंदाजे थेट अंतर)',
+  'transport.locationRequired': 'स्थान आवश्यक',
+  'advisor.locationNeededForTransport': 'मंडीच्या तुलनेसाठी वास्तववादी वाहतूक खर्चाची गणना करण्यासाठी तुमचा जिल्हा निवडा किंवा GPS सुरू करा.',
 };
