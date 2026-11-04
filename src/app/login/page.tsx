@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Lock,
   ShieldAlert,
+  ShieldCheck,
   Sprout,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +23,10 @@ import InputField from '@/components/shared/InputField';
 import PrimaryButton from '@/components/shared/PrimaryButton';
 import AlertMessage from '@/components/shared/AlertMessage';
 import { getCurrentMandiSession, loginMandi } from '@/lib/mandi-service';
+import {
+  getCurrentGovernmentOfficialSession,
+  loginGovernmentOfficial,
+} from '@/lib/government-procurement-service';
 import { UserRole } from '@/types';
 
 function LoginContent() {
@@ -30,7 +35,13 @@ function LoginContent() {
   const { user, loading } = useAuth();
   const { language } = useLanguage();
 
-  const initialRole: UserRole = searchParams.get('role') === 'mandi' ? 'mandi' : 'farmer';
+  const queryRole = searchParams.get('role');
+  const initialRole: UserRole =
+    queryRole === 'mandi'
+      ? 'mandi'
+      : queryRole === 'government'
+      ? 'government'
+      : 'farmer';
   const unauthorizedNotice = searchParams.get('unauthorized');
 
   const [role, setRole] = useState<UserRole>(initialRole);
@@ -42,10 +53,16 @@ function LoginContent() {
   const [mandiLoading, setMandiLoading] = useState(false);
   const [mandiError, setMandiError] = useState<string | null>(null);
 
+  // Government Official Login Form State
+  const [govtIdentifier, setGovtIdentifier] = useState('');
+  const [govtPassword, setGovtPassword] = useState('');
+  const [govtLoading, setGovtLoading] = useState(false);
+  const [govtError, setGovtError] = useState<string | null>(null);
+
   // Sync role from query parameters if URL changes
   useEffect(() => {
     const r = searchParams.get('role');
-    if (r === 'mandi' || r === 'farmer') {
+    if (r === 'mandi' || r === 'farmer' || r === 'government') {
       // The selected login flow mirrors a changing URL query parameter.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRole(r);
@@ -55,16 +72,30 @@ function LoginContent() {
   // Check existing sessions
   useEffect(() => {
     if (!loading) {
+      const rawRedirect = searchParams.get('redirectTo');
+      const safeRedirect =
+        rawRedirect &&
+        rawRedirect.startsWith('/') &&
+        !rawRedirect.startsWith('//') &&
+        !rawRedirect.startsWith('/\\')
+          ? rawRedirect
+          : null;
+
       if (role === 'farmer' && user) {
-        router.push('/slot-booking');
+        router.push(safeRedirect || '/slot-booking');
       } else if (role === 'mandi') {
         const mandiSession = getCurrentMandiSession();
         if (mandiSession) {
-          router.push('/mandi/dashboard');
+          router.push(safeRedirect || '/mandi/dashboard');
+        }
+      } else if (role === 'government') {
+        const govtSession = getCurrentGovernmentOfficialSession();
+        if (govtSession) {
+          router.push(safeRedirect || '/government/dashboard');
         }
       }
     }
-  }, [user, loading, role, router]);
+  }, [user, loading, role, router, searchParams]);
 
   // Mandi portal login submission
   const handleMandiLogin = async (e: React.FormEvent) => {
@@ -87,10 +118,54 @@ function LoginContent() {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('km_mandi_sync'));
       }
-      router.push('/mandi/dashboard');
+      const rawRedirect = searchParams.get('redirectTo');
+      const safeRedirect =
+        rawRedirect &&
+        rawRedirect.startsWith('/') &&
+        !rawRedirect.startsWith('//') &&
+        !rawRedirect.startsWith('/\\')
+          ? rawRedirect
+          : '/mandi/dashboard';
+      router.push(safeRedirect);
     } catch (err: unknown) {
       setMandiError(err instanceof Error ? err.message : 'An error occurred during Mandi operator login.');
       setMandiLoading(false);
+    }
+  };
+
+  // Government Official portal login submission
+  const handleGovtLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGovtError(null);
+
+    if (!govtIdentifier.trim()) {
+      setGovtError('Please enter your authorized Employee ID or official email.');
+      return;
+    }
+
+    setGovtLoading(true);
+    try {
+      const res = await loginGovernmentOfficial(govtIdentifier, govtPassword);
+      if (!res.success || !res.session) {
+        setGovtError(res.error || 'Authentication failed. Official credentials could not be verified.');
+        setGovtLoading(false);
+        return;
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('km_govt_sync'));
+      }
+      const rawRedirect = searchParams.get('redirectTo');
+      const safeRedirect =
+        rawRedirect &&
+        rawRedirect.startsWith('/') &&
+        !rawRedirect.startsWith('//') &&
+        !rawRedirect.startsWith('/\\')
+          ? rawRedirect
+          : '/government/dashboard';
+      router.push(safeRedirect);
+    } catch (err: unknown) {
+      setGovtError(err instanceof Error ? err.message : 'An error occurred during government official login.');
+      setGovtLoading(false);
     }
   };
 
@@ -129,13 +204,19 @@ function LoginContent() {
 
             <div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-primary-200 border border-white/15 mb-4">
-                {role === 'farmer' ? t('login.farmerRoleTitle', language) : t('login.mandiRoleTitle', language)}
+                {role === 'farmer'
+                  ? t('login.farmerRoleTitle', language)
+                  : role === 'mandi'
+                  ? t('login.mandiRoleTitle', language)
+                  : t('login.govtRoleTitle', language)}
               </span>
 
               <h2 className="display-font text-4xl sm:text-5xl leading-tight font-bold">
                 {role === 'farmer'
                   ? t('login.farmerShowcaseTitle', language)
-                  : t('login.mandiShowcaseTitle', language)}
+                  : role === 'mandi'
+                  ? t('login.mandiShowcaseTitle', language)
+                  : t('login.govtShowcaseTitle', language)}
               </h2>
 
               <div className="mt-8 space-y-3 text-sm text-primary-100">
@@ -154,7 +235,7 @@ function LoginContent() {
                       <span>{t('login.farmerPoint3', language)}</span>
                     </div>
                   </>
-                ) : (
+                ) : role === 'mandi' ? (
                   <>
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
@@ -167,6 +248,21 @@ function LoginContent() {
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
                       <span>{t('login.mandiPoint3', language)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0" />
+                      <span>{t('login.govtPoint1', language)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0" />
+                      <span>{t('login.govtPoint2', language)}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-sky-400 shrink-0" />
+                      <span>{t('login.govtPoint3', language)}</span>
                     </div>
                   </>
                 )}
@@ -189,24 +285,25 @@ function LoginContent() {
             </div>
           )}
 
-          {/* ── ROLE SELECTOR TOGGLE (Farmer vs Mandi Portal) ── */}
+          {/* ── ROLE SELECTOR TOGGLE (Farmer vs Mandi vs Government Portal) ── */}
           <div className="mb-6">
-            <div className="bg-primary-950/90 p-1.5 rounded-2xl border border-primary-800/40 flex shadow-md">
+            <div className="bg-primary-950/90 p-1.5 rounded-2xl border border-primary-800/40 flex gap-1 shadow-md">
               <button
                 type="button"
                 id="role-select-farmer"
                 onClick={() => {
                   setRole('farmer');
                   setMandiError(null);
+                  setGovtError(null);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all ${
                   role === 'farmer'
                     ? 'bg-emerald-500 text-emerald-950 shadow-md ring-2 ring-emerald-300/50'
                     : 'text-primary-200 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Sprout className="w-4 h-4 shrink-0" />
-                <span>{t('login.farmerRole', language)}</span>
+                <Sprout className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{t('login.farmerRole', language)}</span>
               </button>
 
               <button
@@ -215,15 +312,34 @@ function LoginContent() {
                 onClick={() => {
                   setRole('mandi');
                   setMandiError(null);
+                  setGovtError(null);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all ${
                   role === 'mandi'
                     ? 'bg-amber-400 text-amber-950 shadow-md ring-2 ring-amber-200/50'
                     : 'text-primary-200 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Building2 className="w-4 h-4 shrink-0" />
-                <span>{t('login.mandiRole', language)}</span>
+                <Building2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{t('login.mandiRole', language)}</span>
+              </button>
+
+              <button
+                type="button"
+                id="role-select-government"
+                onClick={() => {
+                  setRole('government');
+                  setMandiError(null);
+                  setGovtError(null);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-bold transition-all ${
+                  role === 'government'
+                    ? 'bg-sky-400 text-sky-950 shadow-md ring-2 ring-sky-200/50'
+                    : 'text-primary-200 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{t('login.govtRole', language)}</span>
               </button>
             </div>
           </div>
@@ -285,7 +401,7 @@ function LoginContent() {
                 )}
               </FormCard>
             </div>
-          ) : (
+          ) : role === 'mandi' ? (
             /* ════════════════════════════════════════════════════════════════════
              * PATH 2: MANDI PORTAL OPERATOR LOGIN FLOW
              * ════════════════════════════════════════════════════════════════════ */
@@ -357,6 +473,83 @@ function LoginContent() {
                       className="font-bold text-amber-700 hover:text-amber-900 underline underline-offset-2"
                     >
                       {t('login.mandiRegisterBtn', language)}
+                    </Link>
+                  </p>
+                </div>
+              </FormCard>
+            </div>
+          ) : (
+            /* ════════════════════════════════════════════════════════════════════
+             * PATH 3: GOVERNMENT PROCUREMENT OFFICIAL LOGIN FLOW
+             * ════════════════════════════════════════════════════════════════════ */
+            <div>
+              {/* Top Branding */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-sky-700 text-white rounded-2xl shadow-lg mb-3">
+                  <ShieldCheck className="w-7 h-7" aria-hidden="true" />
+                </div>
+                <h1 className="display-font text-3xl font-bold text-primary-950">
+                  {t('login.govtRoleTitle', language)}
+                </h1>
+                <p className="mt-1 text-xs text-primary-700">
+                  {t('login.govtSubtitle', language)}
+                </p>
+              </div>
+
+              {/* Government Official Login Form Card */}
+              <FormCard className="bg-white/95 backdrop-blur border-sky-200 shadow-xl">
+                {govtError && (
+                  <div className="mb-4">
+                    <AlertMessage type="error" message={govtError} onDismiss={() => setGovtError(null)} />
+                  </div>
+                )}
+
+                <form onSubmit={handleGovtLogin} className="space-y-4">
+                  <InputField
+                    id="govt-identifier"
+                    label={t('login.govtIdentifierLabel', language)}
+                    type="text"
+                    placeholder={t('login.govtIdentifierPlaceholder', language)}
+                    value={govtIdentifier}
+                    onChange={(e) => setGovtIdentifier(e.target.value)}
+                    icon={<ShieldCheck className="w-4 h-4" />}
+                    required
+                    autoComplete="username"
+                  />
+
+                  <InputField
+                    id="govt-password"
+                    label={t('login.govtPasswordLabel', language)}
+                    type="password"
+                    placeholder={t('login.govtPasswordPlaceholder', language)}
+                    value={govtPassword}
+                    onChange={(e) => setGovtPassword(e.target.value)}
+                    icon={<Lock className="w-4 h-4" />}
+                    required
+                    autoComplete="current-password"
+                  />
+
+                  <div className="pt-2">
+                    <PrimaryButton
+                      type="submit"
+                      fullWidth
+                      loading={govtLoading}
+                      size="lg"
+                      className="bg-sky-700 hover:bg-sky-800 text-white font-bold"
+                    >
+                      {t('login.govtSignInBtn', language)}
+                    </PrimaryButton>
+                  </div>
+                </form>
+
+                <div className="pt-4 mt-4 border-t border-gray-100 text-center">
+                  <p className="text-xs text-gray-600">
+                    New government inspection official?{' '}
+                    <Link
+                      href="/government/register"
+                      className="font-bold text-sky-700 hover:text-sky-900 underline underline-offset-2"
+                    >
+                      Register Official Credentials
                     </Link>
                   </p>
                 </div>

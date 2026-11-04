@@ -26,6 +26,31 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       document.documentElement.lang = language;
+
+      const handleStorage = (e: StorageEvent) => {
+        if ((e.key === 'km_language' || e.key === 'km_lang') && e.newValue) {
+          const newLang = e.newValue as Language;
+          if (['en', 'hi', 'gu', 'pa', 'mr'].includes(newLang)) {
+            setLanguageState(newLang);
+            document.documentElement.lang = newLang;
+          }
+        }
+      };
+
+      const handleCustomChange = (e: Event) => {
+        const detail = (e as CustomEvent<Language>).detail;
+        if (detail && ['en', 'hi', 'gu', 'pa', 'mr'].includes(detail)) {
+          setLanguageState(detail);
+          document.documentElement.lang = detail;
+        }
+      };
+
+      window.addEventListener('storage', handleStorage);
+      window.addEventListener('km_language_change', handleCustomChange);
+      return () => {
+        window.removeEventListener('storage', handleStorage);
+        window.removeEventListener('km_language_change', handleCustomChange);
+      };
     }
   }, [language]);
 
@@ -34,6 +59,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('km_language', lang);
       window.localStorage.setItem('km_lang', lang);
+      document.cookie = `km_lang=${lang}; path=/; max-age=31536000; SameSite=Lax`;
       document.documentElement.lang = lang;
       window.dispatchEvent(new CustomEvent('km_language_change', { detail: lang }));
     }

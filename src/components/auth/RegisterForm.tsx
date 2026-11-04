@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User,
   Smartphone,
@@ -26,6 +26,7 @@ interface RegisterFormProps {
 export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const { language } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   // Form Fields
@@ -218,10 +219,19 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         message: t('register.success', language),
       });
 
-      // Auto-redirect to home if session established, otherwise to login
+      // Auto-redirect to target service if session established, otherwise to login
+      const rawRedirect = searchParams.get('redirectTo');
+      const safeRedirect =
+        rawRedirect &&
+        rawRedirect.startsWith('/') &&
+        !rawRedirect.startsWith('//') &&
+        !rawRedirect.startsWith('/\\')
+          ? rawRedirect
+          : '/slot-booking';
+
       setTimeout(() => {
         if (data?.session) {
-          router.push('/');
+          router.push(safeRedirect);
           router.refresh();
         } else if (onSwitchToLogin) {
           onSwitchToLogin();

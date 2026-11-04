@@ -517,7 +517,8 @@ ON CONFLICT (code) DO UPDATE SET
 -- 4. Enable RLS and Grant Permissions
 ALTER TABLE mandis ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public can view active mandis" ON mandis;
-CREATE POLICY "Public can view active mandis"
+CREATE POLICY 3
+"Public can view active mandis"
   ON mandis FOR SELECT
   USING (is_active = true AND is_verified = true);
 

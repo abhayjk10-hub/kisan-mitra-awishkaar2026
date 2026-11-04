@@ -60,31 +60,80 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 3. Route Protection: Farmer Pages (e.g. /slot-booking)
-  const isFarmerRoute = pathname.startsWith('/slot-booking');
-  if (isFarmerRoute && !user) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search);
-    return NextResponse.redirect(loginUrl);
+  // 3. Detect active role sessions
+  const hasMandiSession = Boolean(request.cookies.get('km_demo_mandi')?.value);
+  const hasGovtSession = Boolean(request.cookies.get('km_govt_session')?.value);
+  const hasFarmerSession = Boolean(user);
+
+  // Skip route gating for API endpoints and public auth/registration pages
+  const isApiRoute = pathname.startsWith('/api');
+  const isAuthRoute =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/mandi/login') ||
+    pathname.startsWith('/mandi/register') ||
+    pathname.startsWith('/government/register') ||
+    pathname.startsWith('/officers/login');
+
+  if (isApiRoute || isAuthRoute) {
+    return supabaseResponse;
   }
 
-  // 4. Route Protection: Mandi Dashboard (/mandi/dashboard)
-  const isMandiDashboard = pathname.startsWith('/mandi/dashboard');
-  if (isMandiDashboard) {
-    const demoCookie = request.cookies.get('km_demo_mandi');
+  // Farmer specific operational and agricultural services pages
+  const isFarmerSpecificPage =
+    pathname.startsWith('/slot-booking') ||
+    pathname.startsWith('/mandi-prices') ||
+    pathname.startsWith('/services') ||
+    pathname.startsWith('/cold-storage') ||
+    pathname.startsWith('/crop-care') ||
+    pathname.startsWith('/machinery-rental') ||
+    pathname.startsWith('/schemes') ||
+    pathname.startsWith('/vehicle-booking');
 
-    if (demoCookie?.value) {
-      // Allow authenticated mandi operator access when session cookie is verified
+  // Agricultural services catalog and tools (require authenticated session)
+  const isServicesPage =
+    pathname === '/services' ||
+    pathname.startsWith('/services/') ||
+    pathname.startsWith('/procurement') ||
+    pathname.startsWith('/cold-storage') ||
+    pathname.startsWith('/crop-care') ||
+    pathname.startsWith('/machinery-rental') ||
+    pathname.startsWith('/schemes') ||
+    pathname.startsWith('/vehicle-booking');
+
+  // 4. Role Gating: MANDI OPERATOR BOUNDARIES
+  // Mandi operators can only access: Home (/), Mandi Dashboard (/mandi/dashboard), Contact (/contact)
+  if (hasMandiSession) {
+    if (pathname.startsWith('/government/dashboard')) {
+      return NextResponse.redirect(new URL('/mandi/dashboard', request.url));
+    }
+    if (isFarmerSpecificPage || pathname.startsWith('/procurement')) {
+      return NextResponse.redirect(new URL('/mandi/dashboard', request.url));
+    }
+  }
+
+  // 5. Role Gating: GOVERNMENT OFFICIAL BOUNDARIES
+  // Government officials can only access: Home (/), MSP Procurement (/procurement), Procurement Dashboard (/government/dashboard), Contact (/contact)
+  if (hasGovtSession) {
+    if (pathname.startsWith('/mandi/dashboard') || pathname.startsWith('/mandi/warehouse-dashboard')) {
+      return NextResponse.redirect(new URL('/government/dashboard', request.url));
+    }
+    if (isFarmerSpecificPage) {
+      return NextResponse.redirect(new URL('/government/dashboard', request.url));
+    }
+  }
+
+  // 6. Direct Access Protection for Mandi Dashboards
+  if (pathname.startsWith('/mandi/dashboard') || pathname.startsWith('/mandi/warehouse-dashboard')) {
+    if (hasMandiSession) {
       return supabaseResponse;
     }
-
     if (!user) {
       const mandiLoginUrl = new URL('/mandi/login', request.url);
       mandiLoginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search);
       return NextResponse.redirect(mandiLoginUrl);
     }
 
-    // Verify user is linked to a mandi via mandi_staff link table
     try {
       const { data: staff, error } = await supabase
         .from('mandi_staff')
@@ -101,6 +150,39 @@ export async function middleware(request: NextRequest) {
       const unauthorizedUrl = new URL('/mandi/login', request.url);
       unauthorizedUrl.searchParams.set('error', 'mandi_check_failed');
       return NextResponse.redirect(unauthorizedUrl);
+    }
+  }
+
+  // 7. Direct Access Protection for /government/dashboard
+  if (pathname.startsWith('/government/dashboard')) {
+    if (hasGovtSession) {
+      return supabaseResponse;
+    }
+    const govtLoginUrl = new URL('/login', request.url);
+    govtLoginUrl.searchParams.set('role', 'government');
+    govtLoginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search);
+    return NextResponse.redirect(govtLoginUrl);
+  }
+
+  // 8. Direct Access Protection for /slot-booking (Requires authenticated Farmer)
+  if (pathname.startsWith('/slot-booking') && !hasFarmerSession) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('role', 'farmer');
+    loginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // 9. Direct Access Protection for Agricultural Services (Requires signed-in user)
+  if (isServicesPage) {
+    // Government officials have access to /procurement
+    if (hasGovtSession && pathname.startsWith('/procurement')) {
+      return supabaseResponse;
+    }
+
+    if (!user && !hasFarmerSession && !hasGovtSession && !hasMandiSession) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
     }
   }
 

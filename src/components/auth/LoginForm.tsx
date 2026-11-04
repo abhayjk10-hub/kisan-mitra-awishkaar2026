@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Smartphone, Lock, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -16,6 +16,7 @@ type ActiveView = 'login' | 'forgot-password';
 export default function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
   const { language } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [activeView, setActiveView] = useState<ActiveView>('login');
@@ -123,9 +124,18 @@ export default function LoginForm({ onSwitchToRegister }: { onSwitchToRegister: 
         throw new Error(error?.message || t('forgot.accountNotFound', language));
       }
 
+      const rawRedirect = searchParams.get('redirectTo');
+      const safeRedirect =
+        rawRedirect &&
+        rawRedirect.startsWith('/') &&
+        !rawRedirect.startsWith('//') &&
+        !rawRedirect.startsWith('/\\')
+          ? rawRedirect
+          : '/slot-booking';
+
       setAlert({ type: 'success', message: t('login.success', language) });
       setTimeout(() => {
-        router.push('/');
+        router.push(safeRedirect);
         router.refresh();
       }, 700);
       return;

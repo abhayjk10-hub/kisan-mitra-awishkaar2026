@@ -24,7 +24,7 @@ export interface ContactSubmission {
 }
 
 export type AuthMode = 'login' | 'register';
-export type UserRole = 'farmer' | 'mandi';
+export type UserRole = 'farmer' | 'mandi' | 'government';
 export type LoginStep = 'mobile' | 'otp';
 export type RegisterStep = 'details' | 'otp' | 'language';
 
@@ -133,4 +133,7 @@ export interface MandiRegistrationInput {
   opening_time: string;
   closing_time: string;
 }
+
+export * from './warehouse';
+
 

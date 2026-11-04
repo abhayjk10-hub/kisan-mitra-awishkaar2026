@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertTriangle,
   Check,
@@ -354,6 +355,15 @@ export default function MandiDashboardPage() {
 
           {/* Right Action Controls */}
           <div className="flex flex-wrap items-center gap-2.5 self-start md:self-center">
+            {/* Quick Toggle to Warehouse Dashboard */}
+            <Link
+              href="/mandi/warehouse-dashboard"
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-3 py-2 rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+            >
+              <Warehouse className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Warehouse Dashboard</span>
+            </Link>
+
             {/* Switch Mandi Dropdown */}
             <div className="relative">
               <select

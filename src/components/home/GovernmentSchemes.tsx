@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { ArrowUpRight, ExternalLink } from 'lucide-react';
 import { ScrollReveal } from '@/components/shared/ArchiveMotion';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -92,15 +93,24 @@ export default function GovernmentSchemes() {
           <h2>{t('schemes.heading', language)}</h2>
           <p className="archive-muted">{t('schemes.sub', language)}</p>
         </div>
-        <a
-          href="https://agricoop.nic.in/"
-          target="_blank"
-          rel="noreferrer"
-          className="gov-schemes-all"
-          aria-label="View all government agriculture schemes"
-        >
-          {t('schemes.all', language)} <ExternalLink />
-        </a>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href="/schemes"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-600 transition-colors shadow-sm"
+          >
+            <span>All Schemes & Insurance</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </Link>
+          <a
+            href="https://agricoop.nic.in/"
+            target="_blank"
+            rel="noreferrer"
+            className="gov-schemes-all"
+            aria-label="View all government agriculture schemes"
+          >
+            {t('schemes.all', language)} <ExternalLink />
+          </a>
+        </div>
       </div>
 
       <div className="gov-schemes-grid">
