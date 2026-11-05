@@ -1,4 +1,4 @@
-# Kisan Mitra — SIH26032
+# Kisan Mitra — Awishkaar
 
 Farmer Procurement Queue & APMC Slot Booking System (Educational & Demo Initiative)
 
